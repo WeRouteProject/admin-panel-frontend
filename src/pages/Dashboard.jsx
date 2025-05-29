@@ -1,119 +1,142 @@
-import React, { useState } from 'react';
+// Dashboard.jsx - Main Dashboard Component
+import React, { useEffect } from 'react';
 import {
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
-  Paper, Typography, Box, Chip, Avatar, IconButton, Tooltip,
-  Card, CardContent, Fade, Zoom, useTheme, alpha, InputAdornment,
-  TextField, MenuItem, Select, FormControl, InputLabel, Stack,
-  Button, Badge, Divider, LinearProgress
+  Box,
+  Grid,
+  Card,
+  CardContent,
+  Typography,
+  useTheme,
+  alpha,
+  Container,
+  Stack,
+  Avatar,
+  LinearProgress,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  IconButton,
+  Tooltip,
+  Fade,
+  Zoom,
 } from '@mui/material';
 import {
-  Receipt as ReceiptIcon,
-  Search as SearchIcon,
-  FilterList as FilterIcon,
-  GetApp as ExportIcon,
-  Refresh as RefreshIcon,
-  MoreVert as MoreVertIcon,
-  LocalShipping as DeliveryIcon,
-  CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon,
-  Error as ErrorIcon,
-  TrendingUp as TrendingUpIcon
+  TrendingUp,
+  TrendingDown,
+  Visibility,
+  Edit,
+  Delete,
+  LocalShipping,
+  PendingActions,
+  CheckCircle,
+  Schedule,
 } from '@mui/icons-material';
-import StatCardsGrid from '../components/StatCardsGrid';
 import useOrderStore from '../store/useOrderStore';
+import StatCardsGrid from '../components/StatCardsGrid';
 
 const Dashboard = () => {
   const theme = useTheme();
-  const getRecentOrders = useOrderStore((state) => state.getRecentOrders);
+  const { 
+    orders, 
+    loading, 
+    error, 
+    fetchOrders, 
+    getRecentOrders 
+  } = useOrderStore();
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
   const recentOrders = getRecentOrders();
-  
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [loading, setLoading] = useState(false);
-
-  // Filter orders based on search and status
-  const filteredOrders = recentOrders.filter(order => {
-    const matchesSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.products.some(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                         (order.deliveryBoy && order.deliveryBoy.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesStatus = statusFilter === 'All' || order.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'Delivered':
-        return <CheckCircleIcon sx={{ fontSize: 16, mr: 0.5 }} />;
-      case 'Pending':
-        return <ScheduleIcon sx={{ fontSize: 16, mr: 0.5 }} />;
-      case 'Processing':
-        return <TrendingUpIcon sx={{ fontSize: 16, mr: 0.5 }} />;
-      default:
-        return <ErrorIcon sx={{ fontSize: 16, mr: 0.5 }} />;
-    }
-  };
 
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'Delivered':
-        return 'success';
-      case 'Pending':
-        return 'warning';
-      case 'Processing':
-        return 'info';
+    switch (status?.toLowerCase()) {
+      case 'delivered':
+        return theme.palette.success.main;
+      case 'pending':
+        return theme.palette.warning.main;
+      case 'cancelled':
+        return theme.palette.error.main;
+      case 'in transit':
+        return theme.palette.info.main;
       default:
-        return 'error';
+        return theme.palette.grey[500];
     }
   };
 
-  const handleRefresh = () => {
-    setLoading(true);
-    setTimeout(() => setLoading(false), 1000);
+  const getStatusIcon = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'delivered':
+        return <CheckCircle sx={{ fontSize: 16 }} />;
+      case 'pending':
+        return <Schedule sx={{ fontSize: 16 }} />;
+      case 'in transit':
+        return <LocalShipping sx={{ fontSize: 16 }} />;
+      default:
+        return <PendingActions sx={{ fontSize: 16 }} />;
+    }
   };
 
-  return (
-    <Box 
-      sx={{ 
-        p: { xs: 2, sm: 4 },
-        minHeight: '100vh',
-        background: `linear-gradient(135deg, ${alpha(theme.palette.primary.light, 0.1)} 0%, ${alpha(theme.palette.secondary.light, 0.05)} 100%)`,
-      }}
-    >
-      {/* Enhanced Stat Cards */}
-      <Fade in timeout={800}>
-        <Box>
-          <StatCardsGrid />
+  if (loading) {
+    return (
+      <Container maxWidth="xl" sx={{ py: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+          <Stack spacing={2} alignItems="center">
+            <LinearProgress sx={{ width: 200 }} />
+            <Typography variant="h6" color="text.secondary">
+              Loading Dashboard...
+            </Typography>
+          </Stack>
         </Box>
-      </Fade>
+      </Container>
+    );
+  }
 
-      {/* Modern Orders Section */}
-      <Zoom in timeout={1000}>
-        <Card 
-          elevation={0}
-          sx={{ 
-            mt: 4,
-            borderRadius: 3,
-            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-            background: 'rgba(255, 255, 255, 0.9)',
-            backdropFilter: 'blur(10px)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-          }}
-        >
-          <CardContent sx={{ p: 0 }}>
-            {/* Header Section */}
-            <Box sx={{ p: 3, pb: 0 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Avatar
-                    sx={{
-                      bgcolor: alpha(theme.palette.primary.main, 0.1),
-                      color: theme.palette.primary.main,
-                      width: 48,
-                      height: 48,
-                    }}
-                  >
-                    <ReceiptIcon />
-                  </Avatar>
+  if (error) {
+    return (
+      <Container maxWidth="xl" sx={{ py: 4 }}>
+        <Card sx={{ bgcolor: alpha(theme.palette.error.main, 0.1), border: `1px solid ${theme.palette.error.main}` }}>
+          <CardContent>
+            <Typography variant="h6" color="error" gutterBottom>
+              Error Loading Dashboard
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {error}
+            </Typography>
+          </CardContent>
+        </Card>
+      </Container>
+    );
+  }
+
+  return (
+    <Box sx={{ flexGrow: 1 }}>
+      {/* Stats Cards Section */}
+      <StatCardsGrid />
+
+      {/* Recent Orders Section */}
+      <Container maxWidth="xl" sx={{ py: 4 }}>
+        <Fade in timeout={1000}>
+          <Card
+            elevation={0}
+            sx={{
+              borderRadius: 4,
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+              overflow: 'hidden',
+            }}
+          >
+            <CardContent sx={{ p: 0 }}>
+              {/* Section Header */}
+              <Box sx={{ p: 3, pb: 2 }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
                   <Box>
                     <Typography
                       variant="h5"
@@ -123,338 +146,182 @@ const Dashboard = () => {
                         backgroundClip: 'text',
                         WebkitBackgroundClip: 'text',
                         color: 'transparent',
-                        mb: 0.5,
+                        mb: 1,
                       }}
                     >
                       Recent Orders
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Manage and track your latest orders
+                      Latest orders and their current status
                     </Typography>
                   </Box>
-                </Box>
-                
-                <Stack direction="row" spacing={1}>
-                  <Tooltip title="Refresh Orders">
-                    <IconButton 
-                      onClick={handleRefresh}
-                      sx={{ 
-                        bgcolor: alpha(theme.palette.primary.main, 0.1),
-                        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) }
-                      }}
-                    >
-                      <RefreshIcon />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Export Data">
-                    <IconButton sx={{ 
-                      bgcolor: alpha(theme.palette.success.main, 0.1),
-                      '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.2) }
-                    }}>
-                      <ExportIcon />
-                    </IconButton>
-                  </Tooltip>
+                  <Avatar
+                    sx={{
+                      bgcolor: alpha(theme.palette.primary.main, 0.1),
+                      color: theme.palette.primary.main,
+                      width: 48,
+                      height: 48,
+                    }}
+                  >
+                    <LocalShipping />
+                  </Avatar>
                 </Stack>
               </Box>
 
-              {/* Advanced Filters */}
-              <Stack 
-                direction={{ xs: 'column', sm: 'row' }} 
-                spacing={2} 
-                sx={{ mb: 3 }}
-              >
-                <TextField
-                  placeholder="Search orders, products, or delivery personnel..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  size="small"
-                  sx={{ 
-                    flex: 1,
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                      bgcolor: alpha(theme.palette.background.paper, 0.8),
-                    }
-                  }}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon color="action" />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-                
-                <FormControl size="small" sx={{ minWidth: 140 }}>
-                  <InputLabel>Status Filter</InputLabel>
-                  <Select
-                    value={statusFilter}
-                    label="Status Filter"
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    sx={{ 
-                      borderRadius: 2,
-                      bgcolor: alpha(theme.palette.background.paper, 0.8),
-                    }}
-                  >
-                    <MenuItem value="All">All Status</MenuItem>
-                    <MenuItem value="Delivered">Delivered</MenuItem>
-                    <MenuItem value="Pending">Pending</MenuItem>
-                    <MenuItem value="Processing">Processing</MenuItem>
-                  </Select>
-                </FormControl>
-
-                <Button
-                  variant="outlined"
-                  startIcon={<FilterIcon />}
-                  sx={{ 
-                    borderRadius: 2,
-                    minWidth: 120,
-                    borderColor: alpha(theme.palette.primary.main, 0.3),
-                  }}
-                >
-                  More Filters
-                </Button>
-              </Stack>
-
-              {loading && <LinearProgress sx={{ mb: 2, borderRadius: 1 }} />}
-            </Box>
-
-            <Divider sx={{ mx: 3 }} />
-
-            {/* Enhanced Table */}
-            <Box sx={{ p: 3, pt: 2 }}>
-              <TableContainer 
-                component={Paper} 
-                elevation={0}
-                sx={{ 
-                  borderRadius: 2,
-                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                  overflow: 'hidden',
-                }}
-              >
-                <Table stickyHeader>
+              {/* Orders Table */}
+              <TableContainer>
+                <Table sx={{ minWidth: 650 }}>
                   <TableHead>
-                    <TableRow>
-                      <TableCell 
-                        sx={{ 
-                          bgcolor: alpha(theme.palette.primary.main, 0.04),
-                          fontWeight: 700,
-                          fontSize: '0.875rem',
-                          color: theme.palette.primary.main,
-                          border: 'none',
-                        }}
-                      >
-                        Order Details
+                    <TableRow sx={{ bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
+                      <TableCell sx={{ fontWeight: 600, color: 'text.primary' }}>
+                        Order ID
                       </TableCell>
-                      <TableCell 
-                        sx={{ 
-                          bgcolor: alpha(theme.palette.primary.main, 0.04),
-                          fontWeight: 700,
-                          fontSize: '0.875rem',
-                          color: theme.palette.primary.main,
-                          border: 'none',
-                        }}
-                      >
+                      <TableCell sx={{ fontWeight: 600, color: 'text.primary' }}>
+                        Customer
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: 'text.primary' }}>
                         Products
                       </TableCell>
-                      <TableCell 
-                        sx={{ 
-                          bgcolor: alpha(theme.palette.primary.main, 0.04),
-                          fontWeight: 700,
-                          fontSize: '0.875rem',
-                          color: theme.palette.primary.main,
-                          border: 'none',
-                        }}
-                      >
-                        Delivery
+                      <TableCell sx={{ fontWeight: 600, color: 'text.primary' }}>
+                        Amount
                       </TableCell>
-                      <TableCell 
-                        sx={{ 
-                          bgcolor: alpha(theme.palette.primary.main, 0.04),
-                          fontWeight: 700,
-                          fontSize: '0.875rem',
-                          color: theme.palette.primary.main,
-                          border: 'none',
-                        }}
-                      >
+                      <TableCell sx={{ fontWeight: 600, color: 'text.primary' }}>
                         Status
                       </TableCell>
-                      <TableCell 
-                        sx={{ 
-                          bgcolor: alpha(theme.palette.primary.main, 0.04),
-                          fontWeight: 700,
-                          fontSize: '0.875rem',
-                          color: theme.palette.primary.main,
-                          border: 'none',
-                        }}
-                      >
-                        Date
+                      <TableCell sx={{ fontWeight: 600, color: 'text.primary' }}>
+                        Delivery Date
                       </TableCell>
-                      <TableCell 
-                        sx={{ 
-                          bgcolor: alpha(theme.palette.primary.main, 0.04),
-                          width: 60,
-                          border: 'none',
-                        }}
-                      />
+                      
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {filteredOrders.map((order, index) => (
-                      <Fade in timeout={300 + index * 100} key={order.id}>
-                        <TableRow 
-                          hover
-                          sx={{ 
-                            '&:hover': { 
+                    {recentOrders.map((order, index) => (
+                      <Zoom in timeout={600 + index * 100} key={order.id}>
+                        <TableRow
+                          sx={{
+                            '&:hover': {
                               bgcolor: alpha(theme.palette.primary.main, 0.02),
-                              transform: 'scale(1.001)',
-                              transition: 'all 0.2s ease-in-out',
                             },
-                            '&:last-child td': { border: 0 },
-                            cursor: 'pointer',
+                            transition: 'background-color 0.2s ease',
                           }}
                         >
-                          <TableCell sx={{ border: 'none', py: 2 }}>
-                            <Box>
-                              <Typography 
-                                variant="subtitle2" 
-                                sx={{ 
-                                  fontWeight: 600,
-                                  color: theme.palette.primary.main,
-                                  mb: 0.5,
-                                }}
-                              >
-                                #{order.id}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                Order ID
-                              </Typography>
-                            </Box>
+                          <TableCell>
+                            <Typography
+                              variant="subtitle2"
+                              sx={{
+                                fontWeight: 600,
+                                color: theme.palette.primary.main,
+                              }}
+                            >
+                              {order.id}
+                            </Typography>
                           </TableCell>
                           
-                          <TableCell sx={{ border: 'none', py: 2 }}>
-                            <Box>
-                              <Typography 
-                                variant="body2" 
-                                sx={{ 
-                                  fontWeight: 500,
-                                  mb: 0.5,
-                                  maxWidth: 200,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {order.products.map(p => p.name).join(', ')}
-                              </Typography>
-                              <Chip
-                                label={`${order.products.length} item${order.products.length > 1 ? 's' : ''}`}
-                                size="small"
-                                variant="outlined"
-                                sx={{ 
-                                  fontSize: '0.7rem',
-                                  height: 20,
-                                  bgcolor: alpha(theme.palette.info.main, 0.1),
-                                  borderColor: alpha(theme.palette.info.main, 0.3),
-                                  color: theme.palette.info.main,
-                                }}
-                              />
-                            </Box>
-                          </TableCell>
-                          
-                          <TableCell sx={{ border: 'none', py: 2 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <TableCell>
+                            <Stack direction="row" spacing={2} alignItems="center">
                               <Avatar
                                 sx={{
                                   width: 32,
                                   height: 32,
-                                  bgcolor: order.deliveryBoy ? alpha(theme.palette.success.main, 0.1) : alpha(theme.palette.grey[500], 0.1),
-                                  color: order.deliveryBoy ? theme.palette.success.main : theme.palette.grey[500],
+                                  bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                                  color: theme.palette.secondary.main,
                                   fontSize: '0.875rem',
                                 }}
                               >
-                                {order.deliveryBoy ? <DeliveryIcon fontSize="small" /> : '?'}
+                                {order.customerName?.charAt(0)?.toUpperCase()}
                               </Avatar>
                               <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                                  {order.deliveryBoy || 'Unassigned'}
+                                <Typography variant="body2" fontWeight={500}>
+                                  {order.customerName}
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary">
-                                  {order.deliveryBoy ? 'Assigned' : 'Pending assignment'}
+                                  {order.deliveryBoy || 'Unassigned'}
                                 </Typography>
                               </Box>
+                            </Stack>
+                          </TableCell>
+                          
+                          <TableCell>
+                            <Box>
+                              {order.products?.slice(0, 2).map((product, idx) => (
+                                <Typography
+                                  key={idx}
+                                  variant="caption"
+                                  sx={{
+                                    display: 'block',
+                                    color: 'text.secondary',
+                                  }}
+                                >
+                                  {product.name} (×{product.quantity})
+                                </Typography>
+                              ))}
+                              {order.products?.length > 2 && (
+                                <Typography variant="caption" color="primary">
+                                  +{order.products.length - 2} more
+                                </Typography>
+                              )}
                             </Box>
                           </TableCell>
                           
-                          <TableCell sx={{ border: 'none', py: 2 }}>
+                          <TableCell>
+                            <Typography
+                              variant="subtitle2"
+                              sx={{
+                                fontWeight: 600,
+                                color: theme.palette.success.main,
+                              }}
+                            >
+                              ₹{order.totalAmount?.toLocaleString() || '0'}
+                            </Typography>
+                          </TableCell>
+                          
+                          <TableCell>
                             <Chip
                               icon={getStatusIcon(order.status)}
                               label={order.status}
-                              color={getStatusColor(order.status)}
-                              variant="filled"
+                              size="small"
                               sx={{
+                                bgcolor: alpha(getStatusColor(order.status), 0.1),
+                                color: getStatusColor(order.status),
                                 fontWeight: 600,
-                                fontSize: '0.75rem',
-                                height: 32,
-                                borderRadius: 2,
                                 '& .MuiChip-icon': {
-                                  fontSize: 16,
+                                  color: 'inherit',
                                 },
                               }}
                             />
                           </TableCell>
                           
-                          <TableCell sx={{ border: 'none', py: 2 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                              {order.orderDate}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Order date
+                          <TableCell>
+                            <Typography variant="body2" color="text.secondary">
+                              {order.deliveryDate ? 
+                                new Date(order.deliveryDate).toLocaleDateString() : 
+                                'Not set'
+                              }
                             </Typography>
                           </TableCell>
                           
-                          <TableCell sx={{ border: 'none', py: 2 }}>
-                            <Tooltip title="More actions">
-                              <IconButton 
-                                size="small"
-                                sx={{ 
-                                  opacity: 0.7,
-                                  '&:hover': { 
-                                    opacity: 1,
-                                    bgcolor: alpha(theme.palette.primary.main, 0.1),
-                                  }
-                                }}
-                              >
-                                <MoreVertIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </TableCell>
+                          
                         </TableRow>
-                      </Fade>
+                      </Zoom>
                     ))}
                   </TableBody>
                 </Table>
               </TableContainer>
-              
-              {filteredOrders.length === 0 && (
-                <Box 
-                  sx={{ 
-                    textAlign: 'center', 
-                    py: 6,
-                    opacity: 0.7,
-                  }}
-                >
+
+              {recentOrders.length === 0 && (
+                <Box sx={{ p: 4, textAlign: 'center' }}>
                   <Typography variant="h6" color="text.secondary" gutterBottom>
-                    No orders found
+                    No Recent Orders
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Try adjusting your search or filter criteria
+                    Orders will appear here once you start receiving them.
                   </Typography>
                 </Box>
               )}
-            </Box>
-          </CardContent>
-        </Card>
-      </Zoom>
+            </CardContent>
+          </Card>
+        </Fade>
+      </Container>
     </Box>
   );
 };

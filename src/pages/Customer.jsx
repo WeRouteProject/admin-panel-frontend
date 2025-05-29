@@ -17,6 +17,8 @@ const Customer = () => {
     address: '',
   });
 
+  
+
   useEffect(() => {
     fetchCustomers();
   }, [fetchCustomers]);
