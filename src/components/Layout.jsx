@@ -18,8 +18,6 @@ import {
   Divider,
   ListItemButton,
   useMediaQuery,
-  Tooltip,
-  Badge
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -30,12 +28,11 @@ import {
   ShoppingCart,
   ListAlt,
   Logout,
-  Notifications,
-  Settings,
-  AccountCircle
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const drawerWidth = 280;
 
@@ -64,10 +61,25 @@ const Layout = () => {
     if (isMobile) setMobileOpen(false);
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-    setMobileOpen(false);
+  const handleLogout = async () => {
+    try {
+      console.log('Attempting to logout...'); // Debug log
+      await logout(); // Ensure logout is called
+      toast.success('Logged out successfully!', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      setTimeout(() => {
+        navigate('/login');
+        setMobileOpen(false);
+      }, 3500); // Delay navigation to show toast
+    } catch (error) {
+      console.error('Logout failed:', error);
+      toast.error('Failed to logout. Please try again.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    }
   };
 
   const drawer = (
@@ -80,7 +92,6 @@ const Layout = () => {
         flexDirection: 'column',
       }}
     >
-      {/* Enhanced Header */}
       <Box sx={{ p: 3, textAlign: 'center' }}>
         <Avatar
           sx={{
@@ -94,9 +105,9 @@ const Layout = () => {
         >
           <Dashboard sx={{ fontSize: 32, color: '#fff' }} />
         </Avatar>
-        <Typography
-          variant="h5"
-          fontWeight="bold"
+        <Typography 
+          variant="h5" 
+          fontWeight="bold" 
           sx={{
             background: 'linear-gradient(45deg, #fff, #e0e7ff)',
             backgroundClip: 'text',
@@ -114,7 +125,6 @@ const Layout = () => {
 
       <Divider sx={{ bgcolor: alpha('#fff', 0.1), mx: 2 }} />
 
-      {/* Enhanced Navigation */}
       <List sx={{ flex: 1, px: 2, py: 3 }}>
         {navItems.map((item, index) => (
           <ListItem key={item.label} disablePadding sx={{ mb: 1 }}>
@@ -148,8 +158,8 @@ const Layout = () => {
                 },
               }}
             >
-              <ListItemIcon
-                sx={{
+              <ListItemIcon 
+                sx={{ 
                   color: '#fff',
                   minWidth: 48,
                   '& .MuiSvgIcon-root': {
@@ -160,7 +170,7 @@ const Layout = () => {
               >
                 {item.icon}
               </ListItemIcon>
-              <ListItemText
+              <ListItemText 
                 primary={item.label}
                 primaryTypographyProps={{
                   fontWeight: 500,
@@ -174,7 +184,6 @@ const Layout = () => {
 
       <Divider sx={{ bgcolor: alpha('#fff', 0.1), mx: 2 }} />
 
-      {/* Enhanced Logout */}
       <Box sx={{ p: 2 }}>
         <ListItemButton
           onClick={handleLogout}
@@ -194,7 +203,7 @@ const Layout = () => {
           <ListItemIcon sx={{ color: '#ff6b7d', minWidth: 48 }}>
             <Logout />
           </ListItemIcon>
-          <ListItemText
+          <ListItemText 
             primary="Logout"
             primaryTypographyProps={{
               fontWeight: 600,
@@ -209,8 +218,7 @@ const Layout = () => {
   return (
     <Box sx={{ display: 'flex' }}>
       <CssBaseline />
-
-      {/* Enhanced AppBar */}
+      
       <AppBar
         position="fixed"
         sx={{
@@ -230,8 +238,8 @@ const Layout = () => {
               aria-label="open drawer"
               edge="start"
               onClick={handleDrawerToggle}
-              sx={{
-                mr: 2,
+              sx={{ 
+                mr: 2, 
                 display: { md: 'none' },
                 bgcolor: alpha(theme.palette.primary.main, 0.1),
                 '&:hover': {
@@ -241,8 +249,8 @@ const Layout = () => {
             >
               <MenuIcon />
             </IconButton>
-            <Typography
-              variant="h6"
+            <Typography 
+              variant="h6" 
               noWrap
               sx={{
                 fontWeight: 700,
@@ -255,12 +263,9 @@ const Layout = () => {
               Logistics Application
             </Typography>
           </Box>
-
-
         </Toolbar>
       </AppBar>
 
-      {/* Enhanced Sidebar Drawer */}
       <Box
         component="nav"
         sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
@@ -272,7 +277,7 @@ const Layout = () => {
           ModalProps={{ keepMounted: true }}
           sx={{
             display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': {
+            '& .MuiDrawer-paper': { 
               width: drawerWidth,
               border: 'none',
             }
@@ -280,12 +285,12 @@ const Layout = () => {
         >
           {drawer}
         </Drawer>
-
+        
         <Drawer
           variant="permanent"
           sx={{
             display: { xs: 'none', md: 'block' },
-            '& .MuiDrawer-paper': {
+            '& .MuiDrawer-paper': { 
               width: drawerWidth,
               border: 'none',
             }
@@ -296,7 +301,6 @@ const Layout = () => {
         </Drawer>
       </Box>
 
-      {/* Enhanced Main Content */}
       <Box
         component="main"
         sx={{
@@ -322,6 +326,12 @@ const Layout = () => {
           <Outlet />
         </Box>
       </Box>
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        style={{ top: '80px' }}
+        toastStyle={{ zIndex: 10000 }}
+      />
     </Box>
   );
 };

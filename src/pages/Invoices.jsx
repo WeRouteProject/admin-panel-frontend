@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import useOrderStore from '../store/useOrderStore';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { Button, Card, Table } from 'react-bootstrap';
+import { Button, Table } from 'react-bootstrap';
 import logo from '../assets/logo.png'; 
 
 const Invoice = () => {

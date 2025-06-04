@@ -13,9 +13,8 @@ import Cart from '../pages/Cart';
 import useAuthStore from '../store/authStore';
 
 const AppRoutes = () => {
-  //const token = useAuthStore((state) => state.token);
-  const token = true;
-
+  const token = useAuthStore((state) => state.token);
+ 
   return (
     <Routes>
       {/* Public Routes */}
@@ -41,15 +40,6 @@ const AppRoutes = () => {
         <Route path="invoice/:orderId" element={<Invoices />} />
       </Route>
 
-      {/* Dynamic product route (still protected) */}
-      <Route
-        path="/products/:categoryId"
-        element={
-          <ProtectedRoute>
-            <Products />
-          </ProtectedRoute>
-        }
-      />
 
       {/* Catch all */}
       <Route path="*" element={<Navigate to={token ? "/" : "/login"} replace />} />
