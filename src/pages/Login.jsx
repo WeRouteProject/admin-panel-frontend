@@ -112,7 +112,7 @@ const Login = () => {
               letterSpacing: '0.5px',
             }}
           >
-             Login
+            Admin Login
           </Typography>
           {err && (
             <Alert
