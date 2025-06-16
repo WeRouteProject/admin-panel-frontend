@@ -3,7 +3,8 @@ import { useLocation, useParams } from 'react-router-dom';
 import {
   Box, Container, Typography, Button, CardContent, Grid,
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, IconButton,
-  Chip, Paper, Stack, useTheme, alpha, CircularProgress, InputAdornment, MenuItem, Select
+  Chip, Paper, Stack, useTheme, alpha, CircularProgress, InputAdornment, MenuItem, Select,
+  FormControl, FormLabel, RadioGroup, FormControlLabel, Radio
 } from '@mui/material';
 import {
   Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, ShoppingCart as ShoppingCartIcon,
@@ -165,6 +166,7 @@ const Products = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
+  const [productStatus, setProductStatus] = useState('active');
   const { products, fetchProducts, fetchProductById, deleteProduct, saveProduct, loading } = useProductStore();
   const cart = useCartStore((state) => state.cart);
   const addToCart = useCartStore((state) => state.addToCart);
@@ -181,7 +183,7 @@ const Products = () => {
     const fetchCategories = async () => {
       try {
         const res = await axios.get(`${API_BASE}/categories`);
-        setCategories(res.data);
+        setCategories(res.data.filter(cat => cat.status === true));
       } catch (error) {
         console.error('Error fetching categories:', error);
       }
@@ -206,6 +208,13 @@ const Products = () => {
   };
 
   const handleCartClick = async (product) => {
+    if (product.status === false) {
+      toast.error('Cannot add inactive product to cart!', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
     const currentQty = getQuantity(product.productId);
     if (currentQty === 0) {
       await addToCart(product);
@@ -242,14 +251,11 @@ const Products = () => {
   const handleDelete = (id) => {
     setProductToDelete(id);
     setDeleteConfirmOpen(true);
-
   };
 
   const confirmDelete = async () => {
     try {
-
       const isInCart = cart.some((item) => item.productId === productToDelete);
-
       if (isInCart) {
         setDeleteConfirmOpen(false);
         setProductToDelete(null);
@@ -259,7 +265,6 @@ const Products = () => {
         });
         return;
       }
-
       await deleteProduct(productToDelete);
       setDeleteConfirmOpen(false);
       setProductToDelete(null);
@@ -284,13 +289,12 @@ const Products = () => {
       setProductName(product.productName);
       setDescription(product.description);
       setPrice(product.price);
-      // Only set selectedCategory if we're on the all products page
+      setProductStatus(product.status === true ? 'active' : 'inactive');
       if (isAllProductsPage) {
         setSelectedCategory(product.categoryId);
       }
       setImage(null);
       setShowModal(true);
-
     } catch (err) {
       toast.error('Failed to fetch product details. Please try again.', {
         position: 'top-right',
@@ -299,9 +303,7 @@ const Products = () => {
     }
   };
 
-
   const handleSave = async () => {
-
     if (!VALID_NAME_REGEX.test(productName)) {
       toast.error('Product name contains invalid characters. Only letters, numbers, spaces, hyphens, and apostrophes are allowed.', {
         position: 'top-right',
@@ -310,7 +312,6 @@ const Products = () => {
       return;
     }
 
-    // Validation - category is only required for all products page
     const requiredFields = [productName.trim(), description.trim(), price];
     if (isAllProductsPage) {
       requiredFields.push(selectedCategory);
@@ -324,17 +325,38 @@ const Products = () => {
       return;
     }
 
+    // Check if the selected category is active
+    if (isAllProductsPage && productStatus === 'active') {
+      try {
+        const categoryResponse = await axios.get(`${API_BASE}/categories/${selectedCategory}`);
+        if (categoryResponse.data.status === false) {
+          toast.error('Cannot set product to active: the selected category is inactive.', {
+            position: 'top-right',
+            autoClose: 3000,
+          });
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking category status:', error);
+        toast.error('Failed to verify category status. Please try again.', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+        return;
+      }
+    }
+
     try {
       setUploading(true);
       await saveProduct({
         productName,
         description,
         price: parseFloat(price),
-        // Use current categoryId if not on all products page, otherwise use selected category
         categoryId: isAllProductsPage ? parseInt(selectedCategory) : parseInt(categoryId),
         image,
         isEditing,
         editProductId,
+        status: productStatus === 'active' ? true : false
       });
       setShowModal(false);
       setProductName('');
@@ -344,6 +366,7 @@ const Products = () => {
       setSelectedCategory('');
       setEditProductId(null);
       setIsEditing(false);
+      setProductStatus('active');
       toast.success(isEditing ? 'Product updated successfully!' : 'Product added successfully!', {
         position: 'top-right',
         autoClose: 3000,
@@ -368,6 +391,7 @@ const Products = () => {
     setEditProductId(null);
     setIsEditing(false);
     setUploading(false);
+    setProductStatus('active');
   };
 
   const handleImageSelect = (event) => {
@@ -384,6 +408,7 @@ const Products = () => {
     setPrice('');
     setImage(null);
     setSelectedCategory('');
+    setProductStatus('active');
     setShowModal(true);
   };
 
@@ -473,7 +498,6 @@ const Products = () => {
               ? 'Try a different search term'
               : 'Start adding products to see them here.'}
           </Typography>
-
         </EmptyStateContainer>
       )}
 
@@ -481,124 +505,131 @@ const Products = () => {
         <Grid container spacing={3} justifyContent="center">
           {filteredProducts.map((product) => (
             <Grid item key={product.productId}>
-              <CardDesign
-                imageUrl={product.imageUrl}
-                placeholderText="No Image"
-                placeholderIcon={<ImageIcon sx={{ fontSize: 36, mb: 1 }} />}
-                actions={
-                  <>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Chip
-                        icon={<CartButton sx={{ background: 'transparent' }}><ShoppingCartIcon fontSize="small" sx={{ color: theme.palette.text.primary }} /></CartButton>}
-                        label={getQuantity(product.productId) === 0 ? 'Add to Cart' : getQuantity(product.productId)}
-                        onClick={() => handleCartClick(product)}
-                        sx={{
-                          borderColor: 'grey.300',
-                          backgroundColor: 'grey.50',
-                          '& .MuiChip-label': { fontWeight: '500' },
-                          '&:hover': { backgroundColor: 'grey.100', cursor: 'pointer' }
-                        }}
-                      />
-                      {getQuantity(product.productId) > 0 && (
-                        <Stack direction="row" alignItems="center" spacing={0.5}>
-                          <QuantityButton
-                            size="small"
-                            onClick={() => updateProductQuantity(product.productId, -1)}
-                          >
-                            <RemoveIcon fontSize="small" />
-                          </QuantityButton>
-                          <Typography
-                            variant="body2"
-                            fontWeight="medium"
-                            sx={{
-                              minWidth: '24px',
-                              textAlign: 'center',
-                              background: theme.palette.grey[100],
-                              borderRadius: '6px',
-                              px: 1,
-                              py: 0.5,
-                            }}
-                          >
-                            {getQuantity(product.productId)}
-                          </Typography>
-                          <QuantityButton
-                            size="small"
-                            onClick={() => updateProductQuantity(product.productId, 1)}
-                          >
-                            <AddIcon fontSize="small" />
-                          </QuantityButton>
-                        </Stack>
-                      )}
-                    </Box>
-                    <Stack direction="row" spacing={1}>
-                      <ActionIconButton
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEdit(product.productId);
-                        }}
-                      >
-                        <EditIcon sx={{ fontSize: '16px' }} />
-                      </ActionIconButton>
-                      <ActionIconButton
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(product.productId);
-                        }}
-                        sx={{
-                          '&:hover': {
-                            backgroundColor: alpha(theme.palette.error.main, 0.1),
-                            borderColor: theme.palette.error.main,
-                            color: theme.palette.error.main,
-                          }
-                        }}
-                      >
-                        <DeleteIcon sx={{ fontSize: '16px' }} />
-                      </ActionIconButton>
-                    </Stack>
-                  </>
-                }
+              <Box
+                sx={{
+                  opacity: product.status === false ? 0.5 : 1,
+                  filter: product.status === false ? 'grayscale(1)' : 'none',
+                }}
               >
-                <CardContent sx={{ pt: 2, pb: 1 }}>
-                  <Typography
-                    variant="h6"
-                    fontWeight="600"
-                    gutterBottom
-                    sx={{
-                      fontSize: '16px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {product.productName}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{
-                      mb: 1,
-                      fontSize: '13px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical'
-                    }}
-                  >
-                    {product.description}
-                  </Typography>
-                  <Chip
-                    icon={<PriceIcon />}
-                    label={`₹ ${product.price}`}
-                    size="small"
-                    sx={{
-                      background: theme.palette.grey[100],
-                      color: theme.palette.text.primary,
-                      fontWeight: 'medium',
-                    }}
-                  />
-                </CardContent>
-              </CardDesign>
+                <CardDesign
+                  imageUrl={product.imageUrl}
+                  placeholderText="No Image"
+                  placeholderIcon={<ImageIcon sx={{ fontSize: 36, mb: 1 }} />}
+                  actions={
+                    <>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Chip
+                          icon={<CartButton sx={{ background: 'transparent' }}><ShoppingCartIcon fontSize="small" sx={{ color: theme.palette.text.primary }} /></CartButton>}
+                          label={getQuantity(product.productId) === 0 ? 'Add to Cart' : getQuantity(product.productId)}
+                          onClick={() => handleCartClick(product)}
+                          sx={{
+                            borderColor: 'grey.300',
+                            backgroundColor: 'grey.50',
+                            '& .MuiChip-label': { fontWeight: '500' },
+                            '&:hover': { backgroundColor: 'grey.100', cursor: 'pointer' }
+                          }}
+                        />
+                        {getQuantity(product.productId) > 0 && (
+                          <Stack direction="row" alignItems="center" spacing={0.5}>
+                            <QuantityButton
+                              size="small"
+                              onClick={() => updateProductQuantity(product.productId, -1)}
+                            >
+                              <RemoveIcon fontSize="small" />
+                            </QuantityButton>
+                            <Typography
+                              variant="body2"
+                              fontWeight="medium"
+                              sx={{
+                                minWidth: '24px',
+                                textAlign: 'center',
+                                background: theme.palette.grey[100],
+                                borderRadius: '6px',
+                                px: 1,
+                                py: 0.5,
+                              }}
+                            >
+                              {getQuantity(product.productId)}
+                            </Typography>
+                            <QuantityButton
+                              size="small"
+                              onClick={() => updateProductQuantity(product.productId, 1)}
+                            >
+                              <AddIcon fontSize="small" />
+                            </QuantityButton>
+                          </Stack>
+                        )}
+                      </Box>
+                      <Stack direction="row" spacing={1}>
+                        <ActionIconButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(product.productId);
+                          }}
+                        >
+                          <EditIcon sx={{ fontSize: '16px' }} />
+                        </ActionIconButton>
+                        <ActionIconButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(product.productId);
+                          }}
+                          sx={{
+                            '&:hover': {
+                              backgroundColor: alpha(theme.palette.error.main, 0.1),
+                              borderColor: theme.palette.error.main,
+                              color: theme.palette.error.main,
+                            }
+                          }}
+                        >
+                          <DeleteIcon sx={{ fontSize: '16px' }} />
+                        </ActionIconButton>
+                      </Stack>
+                    </>
+                  }
+                >
+                  <CardContent sx={{ pt: 2, pb: 1 }}>
+                    <Typography
+                      variant="h6"
+                      fontWeight="600"
+                      gutterBottom
+                      sx={{
+                        fontSize: '16px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {product.productName}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        mb: 1,
+                        fontSize: '13px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical'
+                      }}
+                    >
+                      {product.description}
+                    </Typography>
+                    <Chip
+                      icon={<PriceIcon />}
+                      label={`₹ ${product.price}`}
+                      size="small"
+                      sx={{
+                        background: theme.palette.grey[100],
+                        color: theme.palette.text.primary,
+                        fontWeight: 'medium',
+                      }}
+                    />
+                  </CardContent>
+                </CardDesign>
+              </Box>
             </Grid>
           ))}
         </Grid>
@@ -670,7 +701,36 @@ const Products = () => {
               }
             }}
           />
-          {/* Only show category selection on all products page */}
+          <FormControl component="fieldset" sx={{ mb: 3, width: '100%' }}>
+            <FormLabel
+              component="legend"
+              sx={{
+                color: 'text.primary',
+                fontWeight: '500',
+                fontSize: '0.875rem',
+                mb: 1,
+              }}
+            >
+              Product Status
+            </FormLabel>
+            <RadioGroup
+              row
+              value={productStatus}
+              onChange={(e) => setProductStatus(e.target.value)}
+              sx={{ gap: 2 }}
+            >
+              <FormControlLabel
+                value="active"
+                control={<Radio sx={{ color: 'grey.400', '&.Mui-checked': { color: 'primary.main' } }} />}
+                label={<Typography variant="body2" sx={{ fontSize: '14px' }}>Active</Typography>}
+              />
+              <FormControlLabel
+                value="inactive"
+                control={<Radio sx={{ color: 'grey.400', '&.Mui-checked': { color: 'primary.main' } }} />}
+                label={<Typography variant="body2" sx={{ fontSize: '14px' }}>Inactive</Typography>}
+              />
+            </RadioGroup>
+          </FormControl>
           {isAllProductsPage && (
             <Select
               fullWidth
@@ -693,7 +753,6 @@ const Products = () => {
               ))}
             </Select>
           )}
-          {/* Show current category info when on category page */}
           {!isAllProductsPage && (
             <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: '8px' }}>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>

@@ -89,22 +89,7 @@ const Dashboard = () => {
     );
   }
 
-  if (error) {
-    return (
-      <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Card sx={{ bgcolor: alpha(theme.palette.error.main, 0.1), border: `1px solid ${theme.palette.error.main}` }}>
-          <CardContent>
-            <Typography variant="h6" color="error" gutterBottom>
-              Error Loading Dashboard
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {error}
-            </Typography>
-          </CardContent>
-        </Card>
-      </Container>
-    );
-  }
+  
 
   return (
     <Box sx={{ flexGrow: 1 }}>
