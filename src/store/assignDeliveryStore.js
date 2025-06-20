@@ -1,4 +1,3 @@
-// store/assignDeliveryStore.js
 import { create } from 'zustand';
 import axios from 'axios';
 
@@ -10,9 +9,23 @@ export const useAssignDeliveryStore = create((set, get) => ({
     set({ loading: true, error: null });
     try {
       const token = localStorage.getItem('token');
+      // Ensure payload matches the API structure
+      const formattedPayload = {
+        cartItems: payload.cartItems,
+        deliveryBoyId: payload.deliveryBoyId,
+        customerName: payload.customerName,
+        deliveryDate: payload.deliveryDate,
+        status: payload.status,
+        deliveryAddress: payload.deliveryAddress,
+        discountedPrice: payload.discountedPrice,
+        customerNumber: payload.customerNumber,
+        customerId: payload.customerId,
+        customerEmail: payload.customerEmail
+      };
+
       const response = await axios.post(
         'https://logistic-project-backend.onrender.com/api/delivery/assign',
-        payload,
+        formattedPayload,
         {
           headers: {
             'Authorization': `Bearer ${token}`,

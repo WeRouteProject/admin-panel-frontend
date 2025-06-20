@@ -285,23 +285,35 @@ const Categories = () => {
       }
 
       let response;
+      let originalCategoryStatus = null;
+
       if (isEditing) {
+        // Fetch the current category to check its original status
+        const currentCategory = categories.find(cat => cat.id === editCategoryId);
+        if (currentCategory) {
+          originalCategoryStatus = currentCategory.status;
+        }
+
         response = await axios.put(`${API_BASE}/categories/${editCategoryId}`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
 
-        // If category is set to inactive, update all products under this category to inactive
-        if (categoryType === 'inactive') {
+        // Check if status has changed
+        const newStatus = categoryType === 'active' ? 'active' : 'inactive';
+        if (originalCategoryStatus !== newStatus) {
           try {
+            // Fetch all products under this category
             const productsResponse = await axios.get(`${API_BASE}/products/category/${editCategoryId}`);
             const products = productsResponse.data;
+
+            // Update each product's status to match the category's new status
             for (const product of products) {
               const productFormData = new FormData();
               productFormData.append('productName', product.productName);
               productFormData.append('description', product.description);
               productFormData.append('price', product.price);
               productFormData.append('categoryId', product.categoryId);
-              productFormData.append('status', 'false');
+              productFormData.append('status', categoryType === 'active' ? 'true' : 'false');
               if (product.imageUrl) {
                 productFormData.append('imageUrl', product.imageUrl);
               }
@@ -309,10 +321,7 @@ const Categories = () => {
                 headers: { 'Content-Type': 'multipart/form-data' }
               });
             }
-            toast.info(`All products under category "${categoryName}" set to inactive.`, {
-              position: 'top-right',
-              autoClose: 3000,
-            });
+
           } catch (error) {
             console.error('Error updating products status:', error);
             toast.error('Failed to update products status. Please try again.', {
@@ -322,15 +331,16 @@ const Categories = () => {
           }
         }
 
+        // Update local categories state instead of refetching
         setCategories(prev =>
           prev.map(cat =>
             cat.id === editCategoryId
               ? {
-                  ...cat,
-                  name: categoryName,
-                  status: categoryType,
-                  imageUrl: response.data.imageUrl ? `${response.data.imageUrl}?t=${new Date().getTime()}` : cat.imageUrl
-                }
+                ...cat,
+                name: categoryName,
+                status: categoryType,
+                imageUrl: response.data.imageUrl ? `${response.data.imageUrl}?t=${new Date().getTime()}` : cat.imageUrl
+              }
               : cat
           )
         );
@@ -356,8 +366,6 @@ const Categories = () => {
         });
       }
 
-      // Refresh categories to ensure latest data
-      await fetchCategories();
       handleModalClose();
     } catch (err) {
       console.error('Error saving category:', err);

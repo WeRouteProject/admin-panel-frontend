@@ -116,6 +116,16 @@ const useProductStore = create((set, get) => ({
       throw err;
     }
   },
+
+  updateProductStatuses: (categoryId, newStatus) => {
+    set((state) => ({
+      products: state.products.map((product) =>
+        product.categoryId === parseInt(categoryId)
+          ? { ...product, status: newStatus }
+          : product
+      ),
+    }));
+  },
 }));
 
 export default useProductStore;

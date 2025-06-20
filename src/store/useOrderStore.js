@@ -3,7 +3,6 @@ import { persist } from 'zustand/middleware';
 import axios from 'axios';
 import useAuthStore from './authStore';
 
-
 const useOrderStore = create(
   persist(
     (set, get) => ({
@@ -15,45 +14,45 @@ const useOrderStore = create(
       loading: false,
       error: null,
 
-       fetchOrders: async () => {
-  const token = useAuthStore.getState().token;
-  set({ loading: true, error: null });
+      fetchOrders: async () => {
+        const token = useAuthStore.getState().token;
+        set({ loading: true, error: null });
 
-  try {
-    const response = await axios.get(
-      'https://logistic-project-backend.onrender.com/api/delivery/all',
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+        try {
+          const response = await axios.get(
+            'https://logistic-project-backend.onrender.com/api/delivery/all',
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
 
-    const data = response.data || [];
+          const data = response.data || [];
 
-    const transformed = data.map((item, index) => ({
-      id: `#ORD${(item.assignmentId || index + 1).toString().padStart(3, '0')}`,
-      customerName: item.customerName,
-      address: item.deliveryAddress,
-      deliveryDate: item.deliveryDate,
-      totalAmount: item.price || 0,
-      orderDate: item.orderDate || item.deliveryDate,
-      products: item.cartItems?.map(ci => ({
-        name: ci.productName,
-        quantity: ci.quantity,
-      })) || [],
-      deliveryBoy: item.deliveryBoyName || '-', // You can resolve name via deliveryBoyId if needed
-      status: item.status,
-    }));
+          const transformed = data.map((item, index) => ({
+            id: `#ORD${(item.assignmentId || index + 1).toString().padStart(3, '0')}`,
+            customerName: item.customerName,
+            address: item.deliveryAddress,
+            deliveryDate: item.deliveryDate,
+            totalAmount: item.price || 0,
+            discountedPrice: item.discountedPrice || 0,
+            orderDate: item.orderDate || item.deliveryDate,
+            products: item.cartItems?.map(ci => ({
+              name: ci.productName,
+              quantity: ci.quantity,
+            })) || [],
+            deliveryBoy: item.deliveryBoyName || '-',
+            status: item.status,
+          }));
 
-    set({ orders: transformed });
-  } catch (err) {
-    set({ error: err.message || 'Failed to fetch orders' });
-  } finally {
-    set({ loading: false });
-  }
-},
-
+          set({ orders: transformed });
+        } catch (err) {
+          set({ error: err.message || 'Failed to fetch orders' });
+        } finally {
+          set({ loading: false });
+        }
+      },
 
       setFilterStatus: (status) => set({ filterStatus: status }),
       setSearchQuery: (query) => set({ searchQuery: query }),
@@ -119,17 +118,5 @@ const useOrderStore = create(
     }
   )
 );
-
-// Helper function to convert products string to object array
-function parseProducts(productsStr, quantitiesStr) {
-  const productParts = productsStr?.split(',') || [];
-  const quantityParts = quantitiesStr?.split(',') || [];
-
-  return productParts.map((product, index) => {
-    const name = product.trim().replace(/\s\d+$/, '');
-    const quantity = Number(quantityParts[index] || 1);
-    return { name, quantity };
-  });
-}
 
 export default useOrderStore;
