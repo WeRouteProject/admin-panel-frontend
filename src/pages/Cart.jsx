@@ -135,20 +135,17 @@ const Cart = () => {
 
   // Calculate discounted price based on customer's discount percentage
   useEffect(() => {
-    const selectedCustomer = customers.find((c) => c.customerName === customerName);
-    if (selectedCustomer) {
-      setSelectedCustomerId(selectedCustomer.customerId);
-      const discountPercentage = Number(selectedCustomer.discount) || 0;
-      setDiscountPercentage(discountPercentage);
-      const discount = (subtotal * discountPercentage) / 100;
-      const calculatedDiscountedPrice = subtotal - discount;
-      setDiscountedPrice(calculatedDiscountedPrice > 0 ? calculatedDiscountedPrice : 0);
-    } else {
-      setSelectedCustomerId(null);
-      setDiscountPercentage(0);
-      setDiscountedPrice(subtotal);
-    }
-  }, [customerName, customers, subtotal]);
+  const selectedCustomer = customers.find((c) => c.customerId === selectedCustomerId);
+  if (selectedCustomer) {
+    const discountPercentage = Number(selectedCustomer.discount) || 0;
+    setDiscountPercentage(discountPercentage);
+    const discount = (subtotal * discountPercentage) / 100;
+    setDiscountedPrice(subtotal - discount > 0 ? subtotal - discount : 0);
+  } else {
+    setDiscountPercentage(0);
+    setDiscountedPrice(subtotal);
+  }
+}, [selectedCustomerId, customers, subtotal]);
 
   const handleUpdateQuantity = async (productId, delta) => {
     try {
@@ -400,45 +397,45 @@ const Cart = () => {
               <Box sx={{ maxWidth: '1200px', mx: 'auto' }}>
                 <Grid container spacing={3} sx={{ display: 'flex', flexWrap: 'wrap' }}>
                   <Grid item xs={12} md={4} sx={{ minWidth: { md: '300px' }, flex: '1 1 auto' }}>
-                    <TextField
-                      fullWidth
-                      select
-                      label="Customer"
-                      value={customerName}
-                      onChange={(e) => {
-                        const selected = e.target.value;
-                        setCustomerName(selected);
-                        const customer = customers.find((c) => c.customerName === selected);
-                        if (customer) {
-                          setAddress(customer.address);
-                          setCustomerEmail(customer.email);
-                          setCustomerPhone(customer.contactNumber);
-                          setSelectedCustomerId(customer.customerId);
-                        } else {
-                          setSelectedCustomerId(null);
-                        }
-                      }}
-                      variant="outlined"
-                      InputProps={{
-                        startAdornment: <PersonIcon sx={{ color: 'action.active', mr: 1 }} />,
-                      }}
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          borderRadius: '8px',
-                          bgcolor: 'grey.50',
-                          height: '50px',
-                          display: 'flex',
-                          width: '330px',
-                          alignItems: 'center',
-                        },
-                      }}
-                    >
-                      {customers.map((cust) => (
-                        <MenuItem key={cust.customerId || cust.id} value={cust.customerName}>
-                          {cust.customerName}
-                        </MenuItem>
-                      ))}
-                    </TextField>
+                    
+                     <TextField
+  fullWidth
+  select
+  label="Customer"
+  value={selectedCustomerId || ''}
+  onChange={(e) => {
+    const customerId = e.target.value;
+    const customer = customers.find((c) => c.customerId === customerId);
+    if (customer) {
+      setCustomerName(customer.customerName);
+      setAddress(customer.address);
+      setCustomerEmail(customer.email);
+      setCustomerPhone(customer.contactNumber);
+      setSelectedCustomerId(customer.customerId);
+      setDiscountPercentage(Number(customer.discount) || 0);
+    }
+  }}
+  variant="outlined"
+  InputProps={{
+    startAdornment: <PersonIcon sx={{ color: 'action.active', mr: 1 }} />,
+  }}
+  sx={{
+    '& .MuiOutlinedInput-root': {
+      borderRadius: '8px',
+      bgcolor: 'grey.50',
+      height: '50px',
+      display: 'flex',
+      width: '330px',
+      alignItems: 'center',
+    },
+  }}
+>
+  {customers.map((cust) => (
+    <MenuItem key={cust.customerId} value={cust.customerId}>
+      {cust.customerName}
+    </MenuItem>
+  ))}
+</TextField>
                   </Grid>
                   <Grid item xs={12} md={4} sx={{ minWidth: { md: '300px' }, flex: '1 1 auto' }}>
                     <TextField
