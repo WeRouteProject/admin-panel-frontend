@@ -16,15 +16,28 @@ import {
   IconButton,
   Stack,
   Divider,
+  Grid,
+  InputAdornment,
 } from '@mui/material';
-import { Add, Edit, Delete, PersonAdd, Email, Phone, LocationOn, Close } from '@mui/icons-material';
+import { 
+  Add, 
+  Edit, 
+  Delete, 
+  PersonAdd, 
+  Email, 
+  Phone, 
+  LocationOn, 
+  Close, 
+  Percent, 
+  AccountBalanceWallet 
+} from '@mui/icons-material';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import useCustomerStore from '../store/customerStore';
-import { VALID_NAME_REGEX, VALID_EMAIL_REGEX} from '../constants/regex';
+import { VALID_NAME_REGEX, VALID_EMAIL_REGEX } from '../constants/regex';
 
 const Customer = () => {
-  const { customers, fetchCustomers, addCustomer, updateCustomer, deleteCustomer } = useCustomerStore();
+  const { customers, fetchCustomers, addCustomer, updateCustomer, deleteCustomer, getCustomerById } = useCustomerStore();
   const [openModal, setOpenModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editingCustomerId, setEditingCustomerId] = useState(null);
@@ -33,6 +46,9 @@ const Customer = () => {
     email: '',
     contactNumber: '',
     address: '',
+    discount: '',
+    wallet: '',
+    remainingCredit: '',
   });
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState(null);
@@ -78,21 +94,77 @@ const Customer = () => {
       return;
     }
 
+    // Validate discount percentage
+    if (form.discount && (isNaN(form.discount) || form.discount < 0 || form.discount > 100)) {
+      toast.error('Discount must be a number between 0 and 100.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+
+    // Validate wallet balance
+    if (form.wallet && (isNaN(form.wallet) || form.wallet < 0)) {
+      toast.error('Wallet balance must be a positive number.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+
+    // Validate remaining credit
+    if (form.remainingCredit && (isNaN(form.remainingCredit) || form.remainingCredit < 0)) {
+      toast.error('Remaining credit must be a positive number.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+
     try {
+      let customerData = {
+        ...form,
+        discount: form.discount ? parseFloat(form.discount) : 0,
+        wallet: form.wallet ? parseFloat(form.wallet) : 0,
+        remainingCredit: form.remainingCredit ? parseFloat(form.remainingCredit) : (form.wallet ? parseFloat(form.wallet) : 0),
+      };
+
+      // Handle update case for remainingCredit sync
       if (editMode && editingCustomerId) {
-        await updateCustomer(editingCustomerId, form);
+        const currentCustomer = getCustomerById(editingCustomerId);
+        if (currentCustomer) {
+          const oldRemainingCredit = currentCustomer.remainingCredit || 0;
+          const oldWallet = currentCustomer.wallet || 0;
+          const newWallet = customerData.wallet;
+          // If remainingCredit matches old value and wallet has changed, sync with new wallet
+          if (form.remainingCredit && parseFloat(form.remainingCredit) === oldRemainingCredit && newWallet !== oldWallet) {
+            customerData.remainingCredit = newWallet;
+          }
+        }
+      }
+
+      if (editMode && editingCustomerId) {
+        await updateCustomer(editingCustomerId, customerData);
         toast.success('Customer updated successfully!', {
           position: 'top-right',
           autoClose: 3000,
         });
       } else {
-        await addCustomer(form);
+        await addCustomer(customerData);
         toast.success('Customer added successfully!', {
           position: 'top-right',
           autoClose: 3000,
         });
       }
-      setForm({ customerName: '', email: '', contactNumber: '', address: '' });
+      setForm({ 
+        customerName: '', 
+        email: '', 
+        contactNumber: '', 
+        address: '', 
+        discount: '', 
+        wallet: '', 
+        remainingCredit: '' 
+      });
       setEditMode(false);
       setEditingCustomerId(null);
       setOpenModal(false);
@@ -110,6 +182,9 @@ const Customer = () => {
       email: customer.email,
       contactNumber: customer.contactNumber,
       address: customer.address,
+      discount: customer.discount || '',
+      wallet: customer.wallet || '',
+      remainingCredit: customer.remainingCredit || '',
     });
     setEditingCustomerId(customer.customerId);
     setEditMode(true);
@@ -144,8 +219,15 @@ const Customer = () => {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount || 0);
+  };
+
   return (
-    <Container maxWidth="lg" sx={{ py: 5 }}>
+    <Container maxWidth="xl" sx={{ py: 5 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Typography variant="h4" component="h1" sx={{ fontWeight: 500 }}>
           👥 Customers
@@ -155,7 +237,15 @@ const Customer = () => {
           color="primary"
           startIcon={<Add />}
           onClick={() => {
-            setForm({ customerName: '', email: '', contactNumber: '', address: '' });
+            setForm({ 
+              customerName: '', 
+              email: '', 
+              contactNumber: '', 
+              address: '', 
+              discount: '', 
+              wallet: '', 
+              remainingCredit: '' 
+            });
             setEditMode(false);
             setEditingCustomerId(null);
             setOpenModal(true);
@@ -165,19 +255,22 @@ const Customer = () => {
         </Button>
       </Box>
 
-      <TableContainer component={Paper} elevation={3}>
+      <TableContainer component={Paper} elevation={3} sx={{ overflowX: 'auto' }}>
         {(!Array.isArray(customers) || customers.length === 0) ? (
           <Typography variant="body1" color="text.secondary" align="center" sx={{ py: 3 }}>
             No customers yet.
           </Typography>
         ) : (
-          <Table>
+          <Table sx={{ minWidth: 800 }}>
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold' }}>Name</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Email</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Phone</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Address</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Discount (%)</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Wallet Balance</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Remaining Credit</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: 120 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -188,6 +281,24 @@ const Customer = () => {
                   <TableCell>{customer.email}</TableCell>
                   <TableCell>{customer.contactNumber}</TableCell>
                   <TableCell>{customer.address}</TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      {customer.discount || 0}
+                      <Percent sx={{ fontSize: 16, mr: 0.5, color: 'text.secondary' }} />
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', color: 'success.main' }}>
+                      <AccountBalanceWallet sx={{ fontSize: 16, mr: 0.5 }} />
+                      {formatCurrency(customer.wallet)}
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', color: 'info.main' }}>
+                      <AccountBalanceWallet sx={{ fontSize: 16, mr: 0.5 }} />
+                      {formatCurrency(customer.remainingCredit)}
+                    </Box>
+                  </TableCell>
                   <TableCell>
                     <Stack direction="row" spacing={1}>
                       <IconButton
@@ -214,102 +325,159 @@ const Customer = () => {
       </TableContainer>
 
       <Modal
-        open={openModal}
-        onClose={() => setOpenModal(false)}
-        aria-labelledby="customer-modal-title"
-      >
-        <Box
-          sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: { xs: '90%', sm: 400 },
-            bgcolor: 'background.paper',
-            boxShadow: 24,
-            p: 4,
-            borderRadius: 2,
-          }}
+    open={openModal}
+    onClose={() => setOpenModal(false)}
+    aria-labelledby="customer-modal-title"
+  >
+    <Box
+      sx={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: { xs: '95%', sm: '90%', md: 600 },
+        bgcolor: 'background.paper',
+        boxShadow: 24,
+        p: 4,
+        borderRadius: 2,
+        maxHeight: '90vh',
+        overflowY: 'auto',
+      }}
+    >
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
+        <Typography id="customer-modal-title" variant="h6" component="h2">
+          {editMode ? 'Edit Customer' : 'Add New Customer'}
+        </Typography>
+        <IconButton
+          onClick={() => setOpenModal(false)}
+          size="small"
+          sx={{ color: 'grey.500' }}
         >
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
-            <Typography id="customer-modal-title" variant="h6" component="h2">
-              {editMode ? 'Edit Customer' : 'Add New Customer'}
-            </Typography>
-            <IconButton
-              onClick={() => setOpenModal(false)}
-              size="small"
-              sx={{ color: 'grey.500' }}
-            >
-              <Close />
-            </IconButton>
-          </Stack>
-          <form onSubmit={handleSubmit}>
-            <Stack spacing={3}>
-              <TextField
-                label="Name"
-                name="customerName"
-                value={form.customerName}
-                onChange={handleInputChange}
-                required
-                fullWidth
-                InputProps={{
-                  startAdornment: <PersonAdd sx={{ mr: 1, color: 'text.secondary' }} />,
-                }}
-              />
-              <TextField
-                label="Email"
-                name="email"
-                type="email"
-                value={form.email}
-                onChange={handleInputChange}
-                required
-                fullWidth
-                InputProps={{
-                  startAdornment: <Email sx={{ mr: 1, color: 'text.secondary' }} />,
-                }}
-              />
-              <TextField
-                label="Phone"
-                name="contactNumber"
-                value={form.contactNumber}
-                onChange={handleInputChange}
-                required
-                fullWidth
-                InputProps={{
-                  startAdornment: <Phone sx={{ mr: 1, color: 'text.secondary' }} />,
-                }}
-              />
-              <TextField
-                label="Address"
-                name="address"
-                value={form.address}
-                onChange={handleInputChange}
-                required
-                fullWidth
-                InputProps={{
-                  startAdornment: <LocationOn sx={{ mr: 1, color: 'text.secondary' }} />,
-                }}
-              />
-            </Stack>
-            <Divider sx={{ my: 3 }} />
-            <Stack direction="row" spacing={2} justifyContent="flex-end">
-              <Button
-                variant="outlined"
-                onClick={() => setOpenModal(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                color="primary"
-              >
-                {editMode ? 'Update' : 'Add'} Customer
-              </Button>
-            </Stack>
-          </form>
-        </Box>
-      </Modal>
+          <Close />
+        </IconButton>
+      </Stack>
+      <form onSubmit={handleSubmit}>
+        <Grid container spacing={3}>
+          <Grid item xs={12} sm={6} md={4}>
+            <TextField
+              label="Name *"
+              name="customerName"
+              value={form.customerName}
+              onChange={handleInputChange}
+              required
+              fullWidth
+              InputProps={{
+                startAdornment: <PersonAdd sx={{ mr: 1, color: 'text.secondary' }} />,
+              }}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <TextField
+              label="Email *"
+              name="email"
+              type="email"
+              value={form.email}
+              onChange={handleInputChange}
+              required
+              fullWidth
+              InputProps={{
+                startAdornment: <Email sx={{ mr: 1, color: 'text.secondary' }} />,
+              }}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <TextField
+              label="Phone *"
+              name="contactNumber"
+              value={form.contactNumber}
+              onChange={handleInputChange}
+              required
+              fullWidth
+              InputProps={{
+                startAdornment: <Phone sx={{ mr: 1, color: 'text.secondary' }} />,
+              }}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <TextField
+              label="Discount (%)"
+              name="discount"
+              type="number"
+              value={form.discount}
+              onChange={handleInputChange}
+              fullWidth
+              inputProps={{ min: 0, max: 100, step: 0.01 }}
+              InputProps={{
+                startAdornment: <Percent sx={{ mr: 1, color: 'text.secondary' }} />,
+              }}
+              helperText="Enter discount percentage (0-100)"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <TextField
+              label="Wallet Balance"
+              name="wallet"
+              type="number"
+              value={form.wallet}
+              onChange={handleInputChange}
+              fullWidth
+              inputProps={{ min: 0, step: 0.01 }}
+              InputProps={{
+                startAdornment: <AccountBalanceWallet sx={{ mr: 1, color: 'text.secondary' }} />,
+              }}
+              helperText="Enter wallet balance amount"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+            <TextField
+              label="Remaining Credit"
+              name="remainingCredit"
+              type="number"
+              value={form.remainingCredit}
+              onChange={handleInputChange}
+              fullWidth
+              inputProps={{ min: 0, step: 0.01 }}
+              InputProps={{
+                startAdornment: <AccountBalanceWallet sx={{ mr: 1, color: 'text.secondary' }} />,
+              }}
+                />
+          </Grid>
+          <Grid item xs={12} sm={12} md={12}>
+            <TextField
+              label="Address *"
+              name="address"
+              value={form.address}
+              onChange={handleInputChange}
+              required
+              width="100%"
+              multiline
+              rows={2}
+              InputProps={{
+                startAdornment: <LocationOn sx={{ mr: 1, color: 'text.secondary', alignSelf: 'flex-start', mt: 1 }} />,
+              }}
+            />
+          </Grid>
+        </Grid>
+        <Divider sx={{ my: 3 }} />
+        <Stack direction="row" spacing={2} justifyContent="flex-end">
+          <Button
+            variant="outlined"
+            onClick={() => setOpenModal(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+          >
+            {editMode ? 'Update' : 'Add'} Customer
+          </Button>
+        </Stack>
+      </form>
+    </Box>
+  </Modal>
+
 
       <Modal
         open={deleteConfirmOpen}

@@ -44,9 +44,12 @@ const Cart = () => {
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [productDetails, setProductDetails] = useState({});
   const [imageLoadingStates, setImageLoadingStates] = useState({});
+  const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+  const [discountedPrice, setDiscountedPrice] = useState(0);
+  const [discountPercentage, setDiscountPercentage] = useState(0);
 
   const getImageUrl = (imagePath) => {
-    if (!imagePath) return 'https://via.placeholder.com/150'; // Fallback placeholder
+    if (!imagePath) return 'https://via.placeholder.com/150';
     if (imagePath.startsWith('http')) return imagePath;
     return `${API_BASE}/${imagePath}`;
   };
@@ -69,7 +72,7 @@ const Cart = () => {
       const fetchPromises = detailsToFetch.map(async (item) => {
         try {
           const product = await fetchProductById(item.productId);
-          const imageUrl = getImageUrl(product.imageUrl || product.image); // Check for both imageUrl and image
+          const imageUrl = getImageUrl(product.imageUrl || product.image);
           details[item.productId] = { ...product, imageUrl };
         } catch (err) {
           console.error(`Failed to fetch product ${item.productId}:`, err);
@@ -130,6 +133,20 @@ const Cart = () => {
     return sum + (price * quantity);
   }, 0);
 
+  // Calculate discounted price based on customer's discount percentage
+  useEffect(() => {
+  const selectedCustomer = customers.find((c) => c.customerId === selectedCustomerId);
+  if (selectedCustomer) {
+    const discountPercentage = Number(selectedCustomer.discount) || 0;
+    setDiscountPercentage(discountPercentage);
+    const discount = (subtotal * discountPercentage) / 100;
+    setDiscountedPrice(subtotal - discount > 0 ? subtotal - discount : 0);
+  } else {
+    setDiscountPercentage(0);
+    setDiscountedPrice(subtotal);
+  }
+}, [selectedCustomerId, customers, subtotal]);
+
   const handleUpdateQuantity = async (productId, delta) => {
     try {
       await updateQuantity(productId, delta);
@@ -152,7 +169,7 @@ const Cart = () => {
   };
 
   const handleCheckout = () => {
-    if (!customerName || !address || !deliveryDate || !agent) {
+    if (!customerName || !address || !deliveryDate || !agent || !selectedCustomerId) {
       toast.error('Please fill in all delivery details before proceeding.', {
         position: 'top-right',
         autoClose: 3000,
@@ -172,6 +189,18 @@ const Cart = () => {
 
   const handleConfirmOrder = async () => {
     setIsCheckoutLoading(true);
+    const selectedCustomer = customers.find((c) => c.customerName === customerName);
+    const walletBalance = selectedCustomer ? Number(selectedCustomer.wallet) || 0 : 0;
+
+    if (discountedPrice > walletBalance) {
+      setIsCheckoutLoading(false);
+      toast.error('Insufficient wallet balance.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+
     const payload = {
       cartItems: cart.map((item) => ({ cartItemId: item.cartItemId })),
       deliveryBoyId: Number(agent),
@@ -181,6 +210,8 @@ const Cart = () => {
       deliveryDate: new Date(deliveryDate).toISOString(),
       status: 'ASSIGNED',
       deliveryAddress: address,
+      discountedPrice: Number(discountedPrice.toFixed(2)),
+      customerId: selectedCustomerId
     };
 
     try {
@@ -291,7 +322,7 @@ const Cart = () => {
                         }}
                         onError={(e) => {
                           console.log(`Failed to load image for product ${item.productId}`);
-                          e.target.src = 'https://via.placeholder.com/150'; // Fallback to placeholder
+                          e.target.src = 'https://via.placeholder.com/150';
                         }}
                       />
                       {!productImage && (
@@ -366,42 +397,45 @@ const Cart = () => {
               <Box sx={{ maxWidth: '1200px', mx: 'auto' }}>
                 <Grid container spacing={3} sx={{ display: 'flex', flexWrap: 'wrap' }}>
                   <Grid item xs={12} md={4} sx={{ minWidth: { md: '300px' }, flex: '1 1 auto' }}>
-                    <TextField
-                      fullWidth
-                      select
-                      label="Customer"
-                      value={customerName}
-                      onChange={(e) => {
-                        const selected = e.target.value;
-                        setCustomerName(selected);
-                        const customer = customers.find((c) => c.customerName === selected);
-                        if (customer) {
-                          setAddress(customer.address);
-                          setCustomerEmail(customer.email);
-                          setCustomerPhone(customer.contactNumber);
-                        }
-                      }}
-                      variant="outlined"
-                      InputProps={{
-                        startAdornment: <PersonIcon sx={{ color: 'action.active', mr: 1 }} />,
-                      }}
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          borderRadius: '8px',
-                          bgcolor: 'grey.50',
-                          height: '50px',
-                          display: 'flex',
-                          width: '330px',
-                          alignItems: 'center',
-                        },
-                      }}
-                    >
-                      {customers.map((cust) => (
-                        <MenuItem key={cust.customerId || cust.id} value={cust.customerName}>
-                          {cust.customerName}
-                        </MenuItem>
-                      ))}
-                    </TextField>
+                    
+                     <TextField
+  fullWidth
+  select
+  label="Customer"
+  value={selectedCustomerId || ''}
+  onChange={(e) => {
+    const customerId = e.target.value;
+    const customer = customers.find((c) => c.customerId === customerId);
+    if (customer) {
+      setCustomerName(customer.customerName);
+      setAddress(customer.address);
+      setCustomerEmail(customer.email);
+      setCustomerPhone(customer.contactNumber);
+      setSelectedCustomerId(customer.customerId);
+      setDiscountPercentage(Number(customer.discount) || 0);
+    }
+  }}
+  variant="outlined"
+  InputProps={{
+    startAdornment: <PersonIcon sx={{ color: 'action.active', mr: 1 }} />,
+  }}
+  sx={{
+    '& .MuiOutlinedInput-root': {
+      borderRadius: '8px',
+      bgcolor: 'grey.50',
+      height: '50px',
+      display: 'flex',
+      width: '330px',
+      alignItems: 'center',
+    },
+  }}
+>
+  {customers.map((cust) => (
+    <MenuItem key={cust.customerId} value={cust.customerId}>
+      {cust.customerName}
+    </MenuItem>
+  ))}
+</TextField>
                   </Grid>
                   <Grid item xs={12} md={4} sx={{ minWidth: { md: '300px' }, flex: '1 1 auto' }}>
                     <TextField
@@ -481,8 +515,8 @@ const Cart = () => {
                       fullWidth
                       label="Delivery Address"
                       value={
-                        address.split(/\s+/).filter(Boolean).length > 6
-                          ? `${address.split(/\s+/).slice(0, 6).join(' ')} ...`
+                        address.split(/\s+/).filter(Boolean).length > 4
+                          ? `${address.split(/\s+/).slice(0, 4).join(' ')} ...`
                           : address
                       }
                       onChange={(e) => setAddress(e.target.value)}
@@ -543,6 +577,13 @@ const Cart = () => {
                 <Typography variant="h5" fontWeight="600" color="primary.main">
                   Total: ₹{subtotal.toFixed(2)}
                 </Typography>
+                {customerName && selectedCustomerId && (
+                  <Typography variant="h6" fontWeight="500" color={discountPercentage > 0 ? "success.main" : "text.secondary"}>
+                    {discountPercentage > 0 
+                      ? `Discounted price after ${discountPercentage}% is: ₹${discountedPrice.toFixed(2)}`
+                      : "No discount available"}
+                  </Typography>
+                )}
                 <Typography variant="body2" color="text.secondary">
                   {cart.length} items in cart
                 </Typography>
@@ -562,7 +603,7 @@ const Cart = () => {
         </>
       )}
 
-      <Dialog open={showModal} onClose={() => setShowModal(false)} maxWidth="sm" fullWidth>
+      <Dialog open={showModal} onClose={() => {if (!isCheckoutLoading) setShowModal(false)}} maxWidth="sm" fullWidth>
         <DialogTitle>
           <Box display="flex" alignItems="center" gap={2}>
             <CheckIcon color="success" />
@@ -596,15 +637,23 @@ const Cart = () => {
             </Box>
             <Divider />
             <Box display="flex" justifyContent="space-between">
-              <Typography variant="h6" fontWeight="600">Total:</Typography>
-              <Typography variant="h6" fontWeight="600" color="success.main">
-                ₹{subtotal.toFixed(2)}
-              </Typography>
+              <Typography variant="body1" fontWeight="500">Total:</Typography>
+              <Typography variant="body1">₹{subtotal.toFixed(2)}</Typography>
             </Box>
+            {customerName && selectedCustomerId && (
+              <Box display="flex" justifyContent="space-between">
+                <Typography variant="body1" fontWeight="500">Discounted Price:</Typography>
+                <Typography variant="body1" color={discountPercentage > 0 ? "success.main" : "text.secondary"}>
+                  {discountPercentage > 0 
+                    ? `After ${discountPercentage}%: ₹${discountedPrice.toFixed(2)}`
+                    : "No discount available"}
+                </Typography>
+              </Box>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setShowModal(false)} variant="outlined">
+          <Button onClick={() => {if (!isCheckoutLoading) setShowModal(false)}} variant="outlined" disabled={isCheckoutLoading}>
             Cancel
           </Button>
           <Button

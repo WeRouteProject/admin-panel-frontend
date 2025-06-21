@@ -18,7 +18,12 @@ const useProductStore = create((set, get) => ({
         ? `${API_BASE}/products/category/${categoryId}`
         : `${API_BASE}/products`;
       const res = await axios.get(endpoint);
-      set({ products: res.data });
+      set({ 
+        products: res.data.map(product => ({
+          ...product,
+          status: product.status === true || product.status === 'true' ? true : false
+        }))
+      });
     } catch (error) {
       console.error('Error fetching products:', error);
       set({ error: error.message || 'Failed to fetch products' });
@@ -34,7 +39,10 @@ const useProductStore = create((set, get) => ({
       }
       set({ loading: true, error: null });
       const res = await axios.get(`${API_BASE}/products/${id}`);
-      return res.data;
+      return {
+        ...res.data,
+        status: res.data.status === true || res.data.status === 'true' ? true : false
+      };
     } catch (error) {
       console.error('Error fetching product:', error);
       set({ error: error.message || 'Failed to fetch product' });
@@ -62,7 +70,7 @@ const useProductStore = create((set, get) => ({
     }
   },
 
-  saveProduct: async ({ productName, description, price, categoryId, image, isEditing, editProductId }) => {
+  saveProduct: async ({ productName, description, price, categoryId, image, isEditing, editProductId, status }) => {
     try {
       if (!productName || !description || isNaN(price) || isNaN(categoryId)) {
         throw new Error('Invalid product data');
@@ -76,6 +84,7 @@ const useProductStore = create((set, get) => ({
       formData.append('description', description);
       formData.append('price', price);
       formData.append('categoryId', parseInt(categoryId));
+      formData.append('status', status.toString());
       if (image) {
         formData.append('image', image);
       }
@@ -87,7 +96,7 @@ const useProductStore = create((set, get) => ({
         });
         set((state) => ({
           products: state.products.map((p) =>
-            p.productId === editProductId ? res.data.data : p
+            p.productId === editProductId ? { ...res.data.data, status: res.data.data.status === true || res.data.data.status === 'true' ? true : false } : p
           ),
           error: null,
         }));
@@ -96,7 +105,7 @@ const useProductStore = create((set, get) => ({
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         set((state) => ({
-          products: [...state.products, res.data.data],
+          products: [...state.products, { ...res.data.data, status: res.data.data.status === true || res.data.data.status === 'true' ? true : false }],
           error: null,
         }));
       }
@@ -106,6 +115,16 @@ const useProductStore = create((set, get) => ({
       set({ error: err.message || 'Failed to save product' });
       throw err;
     }
+  },
+
+  updateProductStatuses: (categoryId, newStatus) => {
+    set((state) => ({
+      products: state.products.map((product) =>
+        product.categoryId === parseInt(categoryId)
+          ? { ...product, status: newStatus }
+          : product
+      ),
+    }));
   },
 }));
 

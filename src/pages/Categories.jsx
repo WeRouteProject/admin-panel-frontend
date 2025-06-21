@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   Box, Container, Typography, Button, CardContent, Grid, Dialog,
   DialogTitle, DialogContent, DialogActions, TextField, IconButton,
-  Paper, Stack, Chip, useTheme, alpha, CircularProgress, InputAdornment
+  Paper, Stack, Chip, useTheme, alpha, CircularProgress, InputAdornment,
+  FormControl, FormLabel, RadioGroup, FormControlLabel, Radio
 } from '@mui/material';
 import {
   Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon,
@@ -13,13 +14,13 @@ import {
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
-import { ToastContainer, toast } from 'react-toastify'; 
-import 'react-toastify/dist/ReactToastify.css'; 
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
 import CardDesign from '../components/CardDesign';
-import { VALID_NAME_REGEX} from '../constants/regex';
+import { VALID_NAME_REGEX } from '../constants/regex';
 
-const API_BASE = 'https://logistic-project-backend.onrender.com/api/categories';
+const API_BASE = 'https://logistic-project-backend.onrender.com/api';
 
 const PageContainer = styled(Container)(({ theme }) => ({
   paddingTop: theme.spacing(3),
@@ -70,7 +71,6 @@ const SearchBar = styled(TextField)(({ theme }) => ({
     },
   },
 }));
-
 
 const ActionIconButton = styled(IconButton)(({ theme }) => ({
   width: '32px',
@@ -172,35 +172,41 @@ const Categories = () => {
   const [showModal, setShowModal] = useState(false);
   const [categoryName, setCategoryName] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
+  const [categoryType, setCategoryType] = useState('active');
   const [previewUrl, setPreviewUrl] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editCategoryId, setEditCategoryId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false); // Added for delete confirmation dialog
-  const [categoryToDelete, setCategoryToDelete] = useState(null); // Added to store category to delete
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
+
+  useEffect(() => {
+    console.log('Current categoryType:', categoryType);
+  }, [categoryType]);
 
   const fetchCategories = async () => {
-  try {
-    setLoading(true);
-    const response = await axios.get(API_BASE);
-    const categoriesData = response.data.map(category => ({
-      id: category.categoryId,
-      name: category.categoryName,
-      imageUrl: category.imageUrl ? `${category.imageUrl}?t=${new Date().getTime()}` : ''
-    }));
-    setCategories(categoriesData);
-    setSearchTerm('');
-  } catch (error) {
-    console.error("Error fetching categories:", error);
-    toast.error('Failed to fetch categories. Please try again.', {
-      position: 'top-right',
-      autoClose: 3000,
-    });
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      setLoading(true);
+      const response = await axios.get(`${API_BASE}/categories`);
+      const categoriesData = response.data.map(category => ({
+        id: category.categoryId,
+        name: category.categoryName,
+        status: category.status === true || category.status === 'true' ? 'active' : 'inactive',
+        imageUrl: category.imageUrl ? `${category.imageUrl}?t=${new Date().getTime()}` : ''
+      }));
+      setCategories(categoriesData);
+      setSearchTerm('');
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      toast.error('Failed to fetch categories. Please try again.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchCategories();
@@ -250,14 +256,15 @@ const Categories = () => {
   };
 
   const handleSaveCategory = async () => {
+    console.log('Saving with categoryType:', categoryType);
 
-    if(!VALID_NAME_REGEX.test(categoryName)){
-          toast.error('Category name contains invalid characters. Only letters, numbers, spaces, hyphens, and apostrophes are allowed.', {
-            position: 'top-right',
-            autoClose: 3000,
-          });
-          return;
-        }
+    if (!VALID_NAME_REGEX.test(categoryName)) {
+      toast.error('Category name contains invalid characters. Only letters, numbers, spaces, hyphens, and apostrophes are allowed.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
 
     if (!categoryName.trim()) {
       toast.error('Please enter a category name.', {
@@ -271,41 +278,85 @@ const Categories = () => {
       setUploading(true);
       const formData = new FormData();
       formData.append('categoryName', categoryName);
-      
+      formData.append('status', categoryType === 'active' ? 'true' : 'false');
+
       if (selectedImage) {
         formData.append('image', selectedImage);
       }
 
+      let response;
+      let originalCategoryStatus = null;
+
       if (isEditing) {
-        const response = await axios.put(`${API_BASE}/${editCategoryId}`, formData, {
+        // Fetch the current category to check its original status
+        const currentCategory = categories.find(cat => cat.id === editCategoryId);
+        if (currentCategory) {
+          originalCategoryStatus = currentCategory.status;
+        }
+
+        response = await axios.put(`${API_BASE}/categories/${editCategoryId}`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
-        
+
+        // Check if status has changed
+        const newStatus = categoryType === 'active' ? 'active' : 'inactive';
+        if (originalCategoryStatus !== newStatus) {
+          try {
+            // Fetch all products under this category
+            const productsResponse = await axios.get(`${API_BASE}/products/category/${editCategoryId}`);
+            const products = productsResponse.data;
+
+            // Update each product's status to match the category's new status
+            for (const product of products) {
+              const productFormData = new FormData();
+              productFormData.append('productName', product.productName);
+              productFormData.append('description', product.description);
+              productFormData.append('price', product.price);
+              productFormData.append('categoryId', product.categoryId);
+              productFormData.append('status', categoryType === 'active' ? 'true' : 'false');
+              if (product.imageUrl) {
+                productFormData.append('imageUrl', product.imageUrl);
+              }
+              await axios.put(`${API_BASE}/products/${product.productId}`, productFormData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+              });
+            }
+
+          } catch (error) {
+            console.error('Error updating products status:', error);
+            toast.error('Failed to update products status. Please try again.', {
+              position: 'top-right',
+              autoClose: 3000,
+            });
+          }
+        }
+
+        // Update local categories state instead of refetching
         setCategories(prev =>
           prev.map(cat =>
-            cat.id === editCategoryId 
-              ? { 
-                  ...cat, 
-                  name: categoryName,
-                  imageUrl: response.data.imageUrl ? `${response.data.imageUrl}?t=${new Date().getTime()}` : cat.imageUrl
-                } 
+            cat.id === editCategoryId
+              ? {
+                ...cat,
+                name: categoryName,
+                status: categoryType,
+                imageUrl: response.data.imageUrl ? `${response.data.imageUrl}?t=${new Date().getTime()}` : cat.imageUrl
+              }
               : cat
           )
         );
-        // Refresh categories to ensure latest data
-        await fetchCategories();
         toast.success('Category updated successfully!', {
           position: 'top-right',
           autoClose: 3000,
         });
       } else {
-        const response = await axios.post(`${API_BASE}/category`, formData, {
+        response = await axios.post(`${API_BASE}/categories/category`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
-        
+
         const newCategory = {
           id: response.data.categoryId,
           name: response.data.categoryName,
+          status: categoryType,
           imageUrl: response.data.imageUrl ? `${response.data.imageUrl}?t=${new Date().getTime()}` : ''
         };
         setCategories(prev => [...prev, newCategory]);
@@ -314,7 +365,7 @@ const Categories = () => {
           autoClose: 3000,
         });
       }
-      
+
       handleModalClose();
     } catch (err) {
       console.error('Error saving category:', err);
@@ -334,7 +385,7 @@ const Categories = () => {
 
   const confirmDelete = async () => {
     try {
-      await axios.delete(`${API_BASE}/${categoryToDelete}`);
+      await axios.delete(`${API_BASE}/categories/${categoryToDelete}`);
       setCategories(categories.filter(cat => cat.id !== categoryToDelete));
       setDeleteConfirmOpen(false);
       setCategoryToDelete(null);
@@ -355,6 +406,7 @@ const Categories = () => {
   const handleModalClose = () => {
     setShowModal(false);
     setCategoryName('');
+    setCategoryType('active');
     setSelectedImage(null);
     setPreviewUrl('');
     setIsEditing(false);
@@ -372,8 +424,14 @@ const Categories = () => {
   };
 
   const handleEditCategory = (category) => {
+    console.log('Editing category:', category);
+    console.log('Category status:', category.status);
+
     setIsEditing(true);
     setEditCategoryId(category.id);
+    const status = category.status === 'active' ? 'active' : 'inactive';
+    setCategoryType(status);
+    console.log('Setting categoryType to:', category.status);
     setCategoryName(category.name || '');
     setPreviewUrl(category.imageUrl || '');
     setSelectedImage(null);
@@ -494,74 +552,81 @@ const Categories = () => {
         <Grid container spacing={3} justifyContent="center">
           {filteredCategories.map((cat) => (
             <Grid item key={cat.id}>
-              <CardDesign
-                imageUrl={cat.imageUrl}
-                placeholderText="No Image"
-                placeholderIcon={<ImageIcon sx={{ fontSize: 36, mb: 1 }} />}
-                actions={
-                  <>
-                    <Typography variant="caption" color="text.secondary">
-                      Manage
-                    </Typography>
-                    <Stack direction="row" spacing={1}>
-                      <ActionIconButton
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditCategory(cat);
-                        }}
-                      >
-                        <EditIcon sx={{ fontSize: '16px' }} />
-                      </ActionIconButton>
-                      <ActionIconButton
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(cat.id);
-                        }}
-                        sx={{
-                          '&:hover': {
-                            backgroundColor: alpha(theme.palette.error.main, 0.1),
-                            borderColor: theme.palette.error.main,
-                            color: theme.palette.error.main,
-                          }
-                        }}
-                      >
-                        <DeleteIcon sx={{ fontSize: '16px' }} />
-                      </ActionIconButton>
-                    </Stack>
-                  </>
-                }
+              <Box
+                sx={{
+                  opacity: cat.status === 'inactive' ? 0.5 : 1,
+                  filter: cat.status === 'inactive' ? 'grayscale(1)' : 'none',
+                }}
               >
-                <CardContent sx={{ p: 2 }}>
-                  <Typography
-                    variant="h6"
-                    fontWeight="500"
-                    color="text.primary"
-                    sx={{
-                      mb: 0.5,
-                      fontSize: '15px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {cat.name}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ fontSize: '12px', mb: 1.5 }}
-                  >
-                    Product category
-                  </Typography>
-                  <SecondaryButton
-                    fullWidth
-                    startIcon={<ViewIcon sx={{ fontSize: '16px' }} />}
-                    onClick={() => handleViewProducts(cat.id, cat.name)}
-                  >
-                    View Products
-                  </SecondaryButton>
-                </CardContent>
-              </CardDesign>
+                <CardDesign
+                  imageUrl={cat.imageUrl}
+                  placeholderText="No Image"
+                  placeholderIcon={<ImageIcon sx={{ fontSize: 36, mb: 1 }} />}
+                  actions={
+                    <>
+                      <Typography variant="caption" color="text.secondary">
+                        Manage
+                      </Typography>
+                      <Stack direction="row" spacing={1}>
+                        <ActionIconButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditCategory(cat);
+                          }}
+                        >
+                          <EditIcon sx={{ fontSize: '16px' }} />
+                        </ActionIconButton>
+                        <ActionIconButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(cat.id);
+                          }}
+                          sx={{
+                            '&:hover': {
+                              backgroundColor: alpha(theme.palette.error.main, 0.1),
+                              borderColor: theme.palette.error.main,
+                              color: theme.palette.error.main,
+                            }
+                          }}
+                        >
+                          <DeleteIcon sx={{ fontSize: '16px' }} />
+                        </ActionIconButton>
+                      </Stack>
+                    </>
+                  }
+                >
+                  <CardContent sx={{ p: 2 }}>
+                    <Typography
+                      variant="h6"
+                      fontWeight="500"
+                      color="text.primary"
+                      sx={{
+                        mb: 0.5,
+                        fontSize: '15px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {cat.name}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ fontSize: '12px', mb: 1.5 }}
+                    >
+                      Product category
+                    </Typography>
+                    <SecondaryButton
+                      fullWidth
+                      startIcon={<ViewIcon sx={{ fontSize: '16px' }} />}
+                      onClick={() => handleViewProducts(cat.id, cat.name)}
+                    >
+                      View Products
+                    </SecondaryButton>
+                  </CardContent>
+                </CardDesign>
+              </Box>
             </Grid>
           ))}
         </Grid>
@@ -587,7 +652,7 @@ const Categories = () => {
             </IconButton>
           </Stack>
         </DialogTitle>
-        
+
         <DialogContent sx={{ pt: 2 }}>
           <TextField
             fullWidth
@@ -603,6 +668,67 @@ const Categories = () => {
               }
             }}
           />
+
+          <FormControl component="fieldset" sx={{ mb: 3, width: '100%' }}>
+            <FormLabel
+              component="legend"
+              sx={{
+                color: 'text.primary',
+                fontWeight: '500',
+                fontSize: '0.875rem',
+                mb: 1,
+              }}
+            >
+              Category Status
+            </FormLabel>
+            <RadioGroup
+              row
+              value={categoryType}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                console.log('Radio button changed to:', newValue);
+                setCategoryType(newValue);
+              }}
+              sx={{ gap: 2 }}
+            >
+              <FormControlLabel
+                value="active"
+                control={
+                  <Radio
+                    sx={{
+                      color: 'grey.400',
+                      '&.Mui-checked': {
+                        color: 'primary.main',
+                      },
+                    }}
+                  />
+                }
+                label={
+                  <Typography variant="body2" sx={{ fontSize: '14px' }}>
+                    Active
+                  </Typography>
+                }
+              />
+              <FormControlLabel
+                value="inactive"
+                control={
+                  <Radio
+                    sx={{
+                      color: 'grey.400',
+                      '&.Mui-checked': {
+                        color: 'primary.main',
+                      },
+                    }}
+                  />
+                }
+                label={
+                  <Typography variant="body2" sx={{ fontSize: '14px' }}>
+                    Inactive
+                  </Typography>
+                }
+              />
+            </RadioGroup>
+          </FormControl>
 
           <Typography variant="subtitle2" color="text.primary" sx={{ mb: 2 }}>
             Category Image
