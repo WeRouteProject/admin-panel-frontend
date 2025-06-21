@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Grid,
@@ -18,6 +18,13 @@ import {
   IconButton,
   CircularProgress,
   alpha,
+  Tooltip,
+  useMediaQuery,
+  useTheme,
+  Card,
+  CardContent,
+  Divider,
+  Chip,
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { styled } from '@mui/material/styles';
@@ -30,6 +37,14 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
   fontWeight: 'bold',
   color: theme.palette.text.primary,
   borderBottom: `1px solid ${theme.palette.divider}`,
+  whiteSpace: 'nowrap',
+  textOverflow: 'ellipsis',
+  overflow: 'hidden',
+  padding: theme.spacing(1, 2),
+  '&.compact': {
+    padding: theme.spacing(0.5, 1),
+    fontSize: '0.75rem',
+  },
 }));
 
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
@@ -42,7 +57,93 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
   },
 }));
 
+const StyledTableCellBody = styled(TableCell)(({ theme }) => ({
+  padding: theme.spacing(1, 2),
+  whiteSpace: 'nowrap',
+  textOverflow: 'ellipsis',
+  overflow: 'hidden',
+  maxWidth: 0, // This allows text-overflow to work
+  '&.compact': {
+    padding: theme.spacing(0.5, 1),
+    fontSize: '0.75rem',
+  },
+}));
+
+// Mobile Card Component
+const MobileOrderCard = ({ order, onViewInvoice }) => (
+  <Card sx={{ mb: 2, borderRadius: 2 }}>
+    <CardContent sx={{ p: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: 'bold', fontSize: '1rem' }}>
+          {order.id}
+        </Typography>
+        <Chip
+          label={order.status}
+          size="small"
+          color={order.status === 'Delivered' ? 'success' : order.status === 'Pending' ? 'warning' : 'default'}
+        />
+      </Box>
+
+      <Box sx={{ mb: 1 }}>
+        <Typography variant="body2" color="text.secondary">Customer</Typography>
+        <Typography variant="body1">{order.customerName}</Typography>
+      </Box>
+
+      <Box sx={{ mb: 1 }}>
+        <Typography variant="body2" color="text.secondary">Address</Typography>
+        <Typography variant="body1" sx={{ wordBreak: 'break-word' }}>{order.address}</Typography>
+      </Box>
+
+      <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Grid item xs={6}>
+          <Typography variant="body2" color="text.secondary">Total</Typography>
+          <Typography variant="body1" sx={{ fontWeight: 'bold' }}>₹{order.totalAmount}</Typography>
+        </Grid>
+        <Grid item xs={6}>
+          <Typography variant="body2" color="text.secondary">Delivery Date</Typography>
+          <Typography variant="body1">{new Date(order.deliveryDate).toLocaleDateString()}</Typography>
+        </Grid>
+      </Grid>
+
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>Products</Typography>
+        {order.products.slice(0, 2).map((p, index) => (
+          <Typography key={index} variant="body2" sx={{ mb: 0.5 }}>
+            {`${p.name} (x${p.quantity})`}
+          </Typography>
+        ))}
+        {order.products.length > 2 && (
+          <Typography variant="body2" color="primary.main">
+            +{order.products.length - 2} more
+          </Typography>
+        )}
+      </Box>
+
+      <Divider sx={{ my: 2 }} />
+
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box>
+          <Typography variant="body2" color="text.secondary">Delivery Boy</Typography>
+          <Typography variant="body2">{order.deliveryBoy || '-'}</Typography>
+        </Box>
+        <IconButton
+          component={Link}
+          to={`/invoice/${order.id.replace('#', '')}`}
+          color="primary"
+          size="small"
+        >
+          <VisibilityIcon />
+        </IconButton>
+      </Box>
+    </CardContent>
+  </Card>
+);
+
 const Orders = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isTablet = useMediaQuery(theme.breakpoints.down('lg'));
+
   const {
     orders,
     filterStatus,
@@ -55,7 +156,6 @@ const Orders = () => {
     fetchOrders,
   } = useOrderStore();
 
-  // State for loading
   const [loading, setLoading] = React.useState(true);
 
   useEffect(() => {
@@ -67,7 +167,6 @@ const Orders = () => {
     loadOrders();
   }, [fetchOrders]);
 
-  // Log orders to debug data
   useEffect(() => {
     console.log('Orders:', orders);
   }, [orders]);
@@ -76,9 +175,7 @@ const Orders = () => {
     let filtered = [...orders];
 
     if (filterStatus) {
-      console.log('Filter Status:', filterStatus);
       filtered = filtered.filter((o) => o.status.toLowerCase() === filterStatus.toLowerCase());
-      console.log('Filtered Orders:', filtered);
     }
 
     if (searchQuery) {
@@ -114,25 +211,80 @@ const Orders = () => {
     setSort(key);
   };
 
+  // Function to truncate text with ellipsis
+  const truncateText = (text, maxLength) => {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  };
+
+  // Column configurations for different screen sizes
+  const getColumnConfig = () => {
+    if (isMobile) {
+      return null; // Use cards for mobile
+    } else if (isTablet) {
+      return {
+        minWidth: 900,
+        columns: [
+          { key: 'id', label: 'Order ID', width: 100 },
+          { key: 'customerName', label: 'Customer', width: 120 },
+          { key: 'address', label: 'Address', width: 140 },
+          { key: 'deliveryDate', label: 'Delivery', width: 100 },
+          { key: 'totalAmount', label: 'Total', width: 80 },
+          { key: 'products', label: 'Products', width: 150 },
+          { key: 'deliveryBoy', label: 'Delivery Boy', width: 120 },
+          { key: 'status', label: 'Status', width: 100 },
+          { key: 'invoice', label: 'Invoice', width: 60 },
+        ]
+      };
+    } else {
+      return {
+        minWidth: 1200,
+        columns: [
+          { key: 'id', label: 'Order ID', width: 100 },
+          { key: 'customerName', label: 'Customer', width: 120 },
+          { key: 'address', label: 'Address', width: 150 },
+          { key: 'deliveryDate', label: 'Delivery Date', width: 120 },
+          { key: 'totalAmount', label: 'Total', width: 100 },
+          { key: 'discountedPrice', label: 'Discounted Price', width: 130 },
+          { key: 'orderDate', label: 'Order Date', width: 120 },
+          { key: 'products', label: 'Products', width: 180 },
+
+          { key: 'deliveryBoy', label: 'Delivery Boy', width: 120 },
+          { key: 'status', label: 'Status', width: 100 },
+          { key: 'invoice', label: 'Invoice', width: 80 },
+        ]
+      };
+    }
+  };
+
+  const columnConfig = getColumnConfig();
+
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: '100%', overflowX: 'auto' }}>
-      <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: 'text.primary', mb: 3 }}>
+    <Box sx={{
+      p: { xs: 1, sm: 2, md: 3 },
+      maxWidth: '100%',
+      width: '100%',
+      overflow: 'hidden'
+    }}>
+      <Typography variant="h5" gutterBottom sx={{
+        fontWeight: 'bold',
+        color: 'text.primary',
+        mb: 3,
+        fontSize: { xs: '1.25rem', sm: '1.5rem' }
+      }}>
         Orders
       </Typography>
 
       {/* Filter & Search Section */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={4} md={3}>
-          <FormControl fullWidth variant="outlined" sx={{ minWidth: 240 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <FormControl fullWidth variant="outlined">
             <InputLabel>Status</InputLabel>
             <Select
               value={filterStatus}
-              onChange={(e) => {
-                console.log('Selected Status:', e.target.value);
-                setFilterStatus(e.target.value);
-              }}
+              onChange={(e) => setFilterStatus(e.target.value)}
               label="Status"
-              sx={{ borderRadius: 2, minWidth: 240 }}
+              sx={{ borderRadius: 2, width: '200px' }}
             >
               <MenuItem value="">All Statuses</MenuItem>
               <MenuItem value="Pending">Pending</MenuItem>
@@ -142,7 +294,7 @@ const Orders = () => {
             </Select>
           </FormControl>
         </Grid>
-        <Grid item xs={12} sm={8} md={6}>
+        <Grid item xs={12} sm={6} md={6}>
           <TextField
             fullWidth
             variant="outlined"
@@ -161,102 +313,181 @@ const Orders = () => {
         </Grid>
       </Grid>
 
-      {/* Orders Table */}
+      {/* Orders Display */}
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
           <CircularProgress />
         </Box>
       ) : (
-        <TableContainer component={Paper} elevation={3} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <StyledTableCell onClick={() => handleSort('id')} sx={{ cursor: 'pointer' }}>
-                  Order ID {sortKey === 'id' && (sortAsc ? '↑' : '↓')}
-                </StyledTableCell>
-                <StyledTableCell>Customer</StyledTableCell>
-                <StyledTableCell>Address</StyledTableCell>
-                <StyledTableCell onClick={() => handleSort('deliveryDate')} sx={{ cursor: 'pointer' }}>
-                  Delivery Date {sortKey === 'deliveryDate' && (sortAsc ? '↑' : '↓')}
-                </StyledTableCell>
-                <StyledTableCell>Total</StyledTableCell>
-                <StyledTableCell onClick={() => handleSort('orderDate')} sx={{ cursor: 'pointer' }}>
-                  Order Date {sortKey === 'orderDate' && (sortAsc ? '↑' : '↓')}
-                </StyledTableCell>
-                <StyledTableCell>Products</StyledTableCell>
-                <StyledTableCell align="center">Quantity</StyledTableCell>
-                <StyledTableCell>Delivery Boy</StyledTableCell>
-                <StyledTableCell>Status</StyledTableCell>
-                <StyledTableCell>Invoice</StyledTableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-  {filteredOrders.map((order) => {
-    // Process products for display: show up to 2 products, stacked vertically
-    const visibleProducts = order.products.slice(0, 2);
-    const extraProducts = order.products.length > 2 ? `+${order.products.length - 2} more` : '';
-
-    // Process address for display (truncate if more than 5 words, as per previous request)
-    const addressWords = order.address.split(' ');
-    const displayAddress = addressWords.length > 5 
-      ? addressWords.slice(0, 5).join(' ') + '...' 
-      : order.address;
-
-    return (
-      <StyledTableRow key={order.id}>
-        <TableCell>{order.id}</TableCell>
-        <TableCell>{order.customerName}</TableCell>
-        <TableCell>{displayAddress}</TableCell>
-        <TableCell>{order.deliveryDate}</TableCell>
-        <TableCell>₹{order.totalAmount}</TableCell>
-        <TableCell>{order.orderDate}</TableCell>
-        <TableCell>
-          <Box sx={{ maxWidth: 200, display: 'flex', flexDirection: 'column' }}>
-            {visibleProducts.map((p, index) => (
-              <Typography
-                key={index}
-                variant="body2"
-                sx={{ textOverflow: 'ellipsis', overflow: 'hidden' }}
+        <>
+          {isMobile ? (
+            // Mobile Card View
+            <Box>
+              {filteredOrders.map((order) => (
+                <MobileOrderCard key={order.id} order={order} />
+              ))}
+            </Box>
+          ) : (
+            // Desktop/Tablet Table View
+            <Box sx={{ width: '100%', overflow: 'hidden' }}>
+              <TableContainer
+                component={Paper}
+                elevation={3}
+                sx={{
+                  borderRadius: 2,
+                  maxWidth: '100%',
+                  '& .MuiTable-root': {
+                    tableLayout: 'fixed',
+                  }
+                }}
               >
-                {`${p.name} (x${p.quantity})`}
-              </Typography>
-            ))}
-            {extraProducts && (
-              <Typography
-                variant="body2"
-                sx={{ color: 'primary.main', mt: 0.5 }}
-              >
-                {extraProducts}
-              </Typography>
-            )}
-          </Box>
-        </TableCell>
-        <TableCell align="center">
-          <Typography variant="body2">
-            {order.products.map((p) => p.quantity).join(', ')}
-          </Typography>
-        </TableCell>
-        <TableCell>{order.deliveryBoy || '-'}</TableCell>
-        <TableCell>{order.status}</TableCell>
-        <TableCell>
-          <IconButton
-            component={Link}
-            to={`/invoice/${order.id.replace('#', '')}`}
-            color="primary"
-            size="small"
-          >
-            <VisibilityIcon />
-          </IconButton>
-        </TableCell>
-      </StyledTableRow>
-    );
-  })}
-</TableBody>
-          </Table>
-        </TableContainer>
+                <Table sx={{ minWidth: columnConfig.minWidth, width: '100%' }}>
+                  <TableHead>
+                    <TableRow>
+                      {columnConfig.columns.map((col) => (
+                        <StyledTableCell
+                          key={col.key}
+                          onClick={col.key !== 'invoice' && col.key !== 'products' && col.key !== 'quantity' ? () => handleSort(col.key) : undefined}
+                          sx={{
+                            cursor: col.key !== 'invoice' && col.key !== 'products' && col.key !== 'quantity' ? 'pointer' : 'default',
+                            width: col.width,
+                            minWidth: col.width,
+                            maxWidth: col.width,
+                            ...(isTablet && { fontSize: '0.8rem', padding: '8px' })
+                          }}
+                          className={isTablet ? 'compact' : ''}
+                        >
+                          {col.label} {sortKey === col.key && (sortAsc ? '↑' : '↓')}
+                        </StyledTableCell>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filteredOrders.map((order) => {
+                      const visibleProducts = order.products.slice(0, 2);
+                      const extraProducts = order.products.length > 2 ? `+${order.products.length - 2} more` : '';
+
+                      return (
+                        <StyledTableRow key={order.id}>
+                          {/* Order ID */}
+                          <StyledTableCellBody className={isTablet ? 'compact' : ''}>
+                            <Tooltip title={order.id} arrow>
+                              <span>{truncateText(order.id, 12)}</span>
+                            </Tooltip>
+                          </StyledTableCellBody>
+
+                          {/* Customer */}
+                          <StyledTableCellBody className={isTablet ? 'compact' : ''}>
+                            <Tooltip title={order.customerName} arrow>
+                              <span>{truncateText(order.customerName, 15)}</span>
+                            </Tooltip>
+                          </StyledTableCellBody>
+
+                          {/* Address */}
+                          <StyledTableCellBody className={isTablet ? 'compact' : ''}>
+                            <Tooltip title={order.address} arrow>
+                              <span>{truncateText(order.address, 20)}</span>
+                            </Tooltip>
+                          </StyledTableCellBody>
+
+                          {/* Delivery Date */}
+                          <StyledTableCellBody className={isTablet ? 'compact' : ''}>
+                            {new Date(order.deliveryDate).toLocaleDateString()}
+                          </StyledTableCellBody>
+
+                          {/* Total */}
+                          <StyledTableCellBody className={isTablet ? 'compact' : ''}>
+                            ₹{order.totalAmount}
+                          </StyledTableCellBody>
+
+                          {/* Discounted Price - Only on desktop */}
+                          {!isTablet && (
+                            <StyledTableCellBody>
+                              ₹{order.discountedPrice || 'N/A'}
+                            </StyledTableCellBody>
+                          )}
+
+                          {/* Order Date - Only on desktop */}
+                          {!isTablet && (
+                            <StyledTableCellBody>
+                              {new Date(order.orderDate).toLocaleDateString()}
+                            </StyledTableCellBody>
+                          )}
+
+                          {/* Products */}
+                          <StyledTableCellBody className={isTablet ? 'compact' : ''}>
+                            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                              {visibleProducts.map((p, index) => (
+                                <Typography
+                                  key={index}
+                                  variant="body2"
+                                  sx={{
+                                    fontSize: isTablet ? '0.7rem' : '0.875rem',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis'
+                                  }}
+                                >
+                                  {truncateText(`${p.name} (x${p.quantity})`, 25)}
+                                </Typography>
+                              ))}
+                              {extraProducts && (
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    color: 'primary.main',
+                                    mt: 0.5,
+                                    fontSize: isTablet ? '0.7rem' : '0.875rem'
+                                  }}
+                                >
+                                  {extraProducts}
+                                </Typography>
+                              )}
+                            </Box>
+                          </StyledTableCellBody>
+
+                          {/* Quantity - Only on desktop */}
+
+
+                          {/* Delivery Boy */}
+                          <StyledTableCellBody className={isTablet ? 'compact' : ''}>
+                            <Tooltip title={order.deliveryBoy || '-'} arrow>
+                              <span>{truncateText(order.deliveryBoy || '-', 15)}</span>
+                            </Tooltip>
+                          </StyledTableCellBody>
+
+                          {/* Status */}
+                          <StyledTableCellBody className={isTablet ? 'compact' : ''}>
+                            <Chip
+                              label={order.status}
+                              size="small"
+                              color={order.status === 'Delivered' ? 'success' : order.status === 'Pending' ? 'warning' : 'default'}
+                              sx={{ fontSize: isTablet ? '0.6rem' : '0.75rem' }}
+                            />
+                          </StyledTableCellBody>
+
+                          {/* Invoice */}
+                          <StyledTableCellBody>
+                            <IconButton
+                              component={Link}
+                              to={`/invoice/${order.id.replace('#', '')}`}
+                              color="primary"
+                              size="small"
+                            >
+                              <VisibilityIcon fontSize="small" />
+                            </IconButton>
+                          </StyledTableCellBody>
+                        </StyledTableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
+        </>
       )}
 
-      {/* No Orders Message */}
       {!loading && filteredOrders.length === 0 && (
         <Box sx={{ textAlign: 'center', py: 4 }}>
           <Typography variant="body1" color="text.secondary">

@@ -9,7 +9,7 @@ import logo from '../assets/logo.png';
 const Invoice = () => {
   const { orderId } = useParams();
   const order = useOrderStore((state) =>
-  state.orders.find((o) => o.id.replace('#', '') === orderId)
+    state.orders.find((o) => o.id.replace('#', '') === orderId)
   );
 
   const invoiceRef = useRef();
@@ -47,7 +47,7 @@ const Invoice = () => {
           <div className="text-end">
             <h3 className="fw-bold mb-0">Invoice</h3>
             <p className="mb-0">Invoice #: {order.id}</p>
-            <p className="mb-0">Date: {order.orderDate}</p>
+            <p className="mb-0">Date: {new Date(order.orderDate).toLocaleDateString()}</p>
           </div>
         </div>
 
@@ -56,8 +56,8 @@ const Invoice = () => {
           <h5 className="fw-bold">Bill To:</h5>
           <p className="mb-0">{order.customerName}</p>
           <p className="mb-0">{order.address}</p>
-          <p className="mb-0">Delivery Date: {order.deliveryDate}</p>
-          <p className="mb-0">Payment Mode: {order.paymentStatus}</p>
+          <p className="mb-0">Delivery Date: {new Date(order.deliveryDate).toLocaleDateString()}</p>
+          <p className="mb-0">Payment Mode: {order.paymentStatus || 'N/A'}</p>
         </div>
 
         {/* Products */}
@@ -84,6 +84,7 @@ const Invoice = () => {
         <div className="d-flex justify-content-end mt-4">
           <div className="text-end">
             <h5 className="fw-bold">Total Amount: ₹{order.totalAmount.toFixed(2)}</h5>
+            <h5 className="fw-bold">Discounted Price: ₹{order.discountedPrice.toFixed(2) || '0.00'}</h5>
             <p className="mb-0">Status: {order.status}</p>
             <p className="mb-0">Delivered By: {order.deliveryBoy || 'Unassigned'}</p>
           </div>

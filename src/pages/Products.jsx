@@ -326,9 +326,10 @@ const Products = () => {
     }
 
     // Check if the selected category is active
-    if (isAllProductsPage && productStatus === 'active') {
+    if (productStatus === 'active') {
       try {
-        const categoryResponse = await axios.get(`${API_BASE}/categories/${selectedCategory}`);
+        const categoryToCheck = isAllProductsPage ? selectedCategory : categoryId;
+        const categoryResponse = await axios.get(`${API_BASE}/categories/${categoryToCheck}`);
         if (categoryResponse.data.status === false) {
           toast.error('Cannot set product to active: the selected category is inactive.', {
             position: 'top-right',
@@ -401,16 +402,46 @@ const Products = () => {
     }
   };
 
-  const openAddProductModal = () => {
+  const openAddProductModal = async () => {
     setIsEditing(false);
     setProductName('');
     setDescription('');
     setPrice('');
     setImage(null);
     setSelectedCategory('');
-    setProductStatus('active');
+    
+    // Set default product status based on category status
+    try {
+      const categoryToCheck = isAllProductsPage ? selectedCategory : categoryId;
+      if (categoryToCheck) {
+        const categoryResponse = await axios.get(`${API_BASE}/categories/${categoryToCheck}`);
+        setProductStatus(categoryResponse.data.status === true ? 'active' : 'inactive');
+      } else {
+        setProductStatus('active'); // Default to active if no category selected yet
+      }
+    } catch (error) {
+      console.error('Error fetching category status:', error);
+      setProductStatus('active'); // Fallback to active on error
+    }
+    
     setShowModal(true);
   };
+
+  // Update productStatus when selectedCategory changes in all-products page
+  useEffect(() => {
+    if (isAllProductsPage && selectedCategory && !isEditing) {
+      const fetchCategoryStatus = async () => {
+        try {
+          const categoryResponse = await axios.get(`${API_BASE}/categories/${selectedCategory}`);
+          setProductStatus(categoryResponse.data.status === true ? 'active' : 'inactive');
+        } catch (error) {
+          console.error('Error fetching category status:', error);
+          setProductStatus('active');
+        }
+      };
+      fetchCategoryStatus();
+    }
+  }, [selectedCategory, isAllProductsPage, isEditing]);
 
   return (
     <PageContainer maxWidth="xl">
