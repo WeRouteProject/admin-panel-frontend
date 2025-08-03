@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import axios from 'axios';
+import axiosInstance from '../utils/axiosInstance';
 
-const API_BASE = 'https://logistic-project-backend.onrender.com/api';
+const API_BASE = 'http://35.170.21.202:3000/api';
+
 
 const useProductStore = create((set, get) => ({
   products: [],
@@ -17,12 +19,21 @@ const useProductStore = create((set, get) => ({
       const endpoint = categoryId
         ? `${API_BASE}/products/category/${categoryId}`
         : `${API_BASE}/products`;
-      const res = await axios.get(endpoint);
-      set({ 
-        products: res.data.map(product => ({
-          ...product,
-          status: product.status === true || product.status === 'true' ? true : false
-        }))
+      const res = await axiosInstance.get(endpoint);
+      set({
+        products: res.data.map(product => {
+          const isActive = product.status === true || product.status === 'true';
+          const discount = parseFloat(product.discount || 0);
+          const discountedPrice = discount
+            ? Math.round(product.price - (product.price * discount) / 100)
+            : null;
+
+          return {
+            ...product,
+            status: isActive,
+            discountedPrice: discountedPrice
+          };
+        })
       });
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -38,10 +49,16 @@ const useProductStore = create((set, get) => ({
         throw new Error('Invalid product ID');
       }
       set({ loading: true, error: null });
-      const res = await axios.get(`${API_BASE}/products/${id}`);
+      const res = await axiosInstance.get(`/products/${id}`);
+      const product = res.data;
+      const discount = parseFloat(product.discount || 0);
+      const discountedPrice = discount
+        ? Math.round(product.price - (product.price * discount) / 100)
+        : null;
       return {
-        ...res.data,
-        status: res.data.status === true || res.data.status === 'true' ? true : false
+        ...product,
+        status: product.status === true || product.status === 'true',
+        discountedPrice
       };
     } catch (error) {
       console.error('Error fetching product:', error);
@@ -57,7 +74,7 @@ const useProductStore = create((set, get) => ({
       if (!id || isNaN(id)) {
         throw new Error('Invalid product ID');
       }
-      const res = await axios.delete(`${API_BASE}/products/${id}`);
+      const res = await axiosInstance.delete(`/products/${id}`);
       set((state) => ({
         products: state.products.filter((p) => p.productId !== id),
         error: null,
@@ -70,7 +87,17 @@ const useProductStore = create((set, get) => ({
     }
   },
 
-  saveProduct: async ({ productName, description, price, categoryId, image, isEditing, editProductId, status }) => {
+  saveProduct: async ({
+    productName,
+    description,
+    price,
+    categoryId,
+    image,
+    isEditing,
+    editProductId,
+    status,
+    discount, // ✅ Added discount
+  }) => {
     try {
       if (!productName || !description || isNaN(price) || isNaN(categoryId)) {
         throw new Error('Invalid product data');
@@ -85,27 +112,55 @@ const useProductStore = create((set, get) => ({
       formData.append('price', price);
       formData.append('categoryId', parseInt(categoryId));
       formData.append('status', status.toString());
+      if (discount) {
+        formData.append('discount', discount); // ✅ Append discount if provided
+      }
       if (image) {
         formData.append('image', image);
       }
 
       let res;
       if (isEditing) {
-        res = await axios.put(`${API_BASE}/products/${editProductId}`, formData, {
+        res = await axiosInstance.put(`/products/${editProductId}`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
+        const updatedProduct = res.data.data;
+        const discount = parseFloat(updatedProduct.discount || 0);
+        const discountedPrice = discount
+          ? Math.round(updatedProduct.price - (updatedProduct.price * discount) / 100)
+          : null;
+
         set((state) => ({
           products: state.products.map((p) =>
-            p.productId === editProductId ? { ...res.data.data, status: res.data.data.status === true || res.data.data.status === 'true' ? true : false } : p
+            p.productId === editProductId
+              ? {
+                  ...updatedProduct,
+                  status: updatedProduct.status === true || updatedProduct.status === 'true',
+                  discountedPrice
+                }
+              : p
           ),
           error: null,
         }));
       } else {
-        res = await axios.post(`${API_BASE}/products`, formData, {
+        res = await axiosInstance.post(`/products`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
+        const newProduct = res.data.data;
+        const discount = parseFloat(newProduct.discount || 0);
+        const discountedPrice = discount
+          ? Math.round(newProduct.price - (newProduct.price * discount) / 100)
+          : null;
+
         set((state) => ({
-          products: [...state.products, { ...res.data.data, status: res.data.data.status === true || res.data.data.status === 'true' ? true : false }],
+          products: [
+            ...state.products,
+            {
+              ...newProduct,
+              status: newProduct.status === true || newProduct.status === 'true',
+              discountedPrice
+            }
+          ],
           error: null,
         }));
       }

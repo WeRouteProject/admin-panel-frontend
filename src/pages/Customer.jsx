@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Switch } from '@mui/material';
 import {
   Container,
   Box,
@@ -42,14 +43,15 @@ const Customer = () => {
   const [editMode, setEditMode] = useState(false);
   const [editingCustomerId, setEditingCustomerId] = useState(null);
   const [form, setForm] = useState({
-    customerName: '',
-    email: '',
-    contactNumber: '',
-    address: '',
-    discount: '',
-    wallet: '',
-    remainingCredit: '',
-  });
+  customerName: '',
+  email: '',
+  contactNumber: '',
+  address: '',
+  discount: '',
+  wallet: '',
+  remainingCredit: '',
+  applyCustomerDiscount: false,
+});
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState(null);
 
@@ -185,6 +187,7 @@ const Customer = () => {
       discount: customer.discount || '',
       wallet: customer.wallet || '',
       remainingCredit: customer.remainingCredit || '',
+      applyCustomerDiscount: customer.applyCustomerDiscount || false,
     });
     setEditingCustomerId(customer.customerId);
     setEditMode(true);
@@ -219,12 +222,12 @@ const Customer = () => {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount || 0);
-  };
+  // const formatCurrency = (amount) => {
+  //   return new Intl.NumberFormat('en-US', {
+  //     style: 'currency',
+  //     currency: 'USD',
+  //   }).format(amount || 0);
+  // };
 
   return (
     <Container maxWidth="xl" sx={{ py: 5 }}>
@@ -271,6 +274,7 @@ const Customer = () => {
                 <TableCell sx={{ fontWeight: 'bold' }}>Discount (%)</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Wallet Balance</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Remaining Credit</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Apply Discount</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: 120 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -290,15 +294,17 @@ const Customer = () => {
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', color: 'success.main' }}>
                       <AccountBalanceWallet sx={{ fontSize: 16, mr: 0.5 }} />
-                      {formatCurrency(customer.wallet)}
+                      {customer.wallet}
                     </Box>
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', color: 'info.main' }}>
                       <AccountBalanceWallet sx={{ fontSize: 16, mr: 0.5 }} />
-                      {formatCurrency(customer.remainingCredit)}
+                      {customer.remainingCredit}
                     </Box>
                   </TableCell>
+                  <TableCell>{customer.applyCustomerDiscount ? 'Yes' : 'No'}</TableCell>
+
                   <TableCell>
                     <Stack direction="row" spacing={1}>
                       <IconButton
@@ -442,6 +448,24 @@ const Customer = () => {
               }}
                 />
           </Grid>
+          <Grid item xs={12} sm={6} md={4}>
+  <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+    <Typography variant="body1" sx={{ mr: 2 }}>
+      Apply Discount
+    </Typography>
+    <Switch
+      checked={form.applyCustomerDiscount}
+      onChange={(e) =>
+        setForm((prev) => ({
+          ...prev,
+          applyCustomerDiscount: e.target.checked,
+        }))
+      }
+      color="primary"
+    />
+  </Box>
+</Grid>
+
           <Grid item xs={12} sm={12} md={12}>
             <TextField
               label="Address *"

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+
+
 import {
   Box, Container, Typography, Button, CardContent, Grid, Dialog,
   DialogTitle, DialogContent, DialogActions, TextField, IconButton,
@@ -17,15 +19,16 @@ import { useNavigate } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
+import axiosInstance from '../utils/axiosInstance'; 
 import CardDesign from '../components/CardDesign';
 import { VALID_NAME_REGEX } from '../constants/regex';
 
-const API_BASE = 'https://logistic-project-backend.onrender.com/api';
 
 const PageContainer = styled(Container)(({ theme }) => ({
   paddingTop: theme.spacing(3),
   paddingBottom: theme.spacing(6),
 }));
+
 
 const HeaderContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
@@ -188,7 +191,7 @@ const Categories = () => {
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE}/categories`);
+      const response = await axiosInstance.get('/categories');
       const categoriesData = response.data.map(category => ({
         id: category.categoryId,
         name: category.categoryName,
@@ -294,16 +297,18 @@ const Categories = () => {
           originalCategoryStatus = currentCategory.status;
         }
 
-        response = await axios.put(`${API_BASE}/categories/${editCategoryId}`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        response = await axiosInstance.put(`/categories/${editCategoryId}`, formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+});
+
 
         // Check if status has changed
         const newStatus = categoryType === 'active' ? 'active' : 'inactive';
         if (originalCategoryStatus !== newStatus) {
           try {
             // Fetch all products under this category
-            const productsResponse = await axios.get(`${API_BASE}/products/category/${editCategoryId}`);
+            const productsResponse = await axiosInstance.get(`/products/category/${editCategoryId}`);
+
             const products = productsResponse.data;
 
             // Update each product's status to match the category's new status
@@ -317,9 +322,10 @@ const Categories = () => {
               if (product.imageUrl) {
                 productFormData.append('imageUrl', product.imageUrl);
               }
-              await axios.put(`${API_BASE}/products/${product.productId}`, productFormData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-              });
+              await axiosInstance.put(`/products/${product.productId}`, productFormData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+});
+
             }
 
           } catch (error) {
@@ -349,9 +355,10 @@ const Categories = () => {
           autoClose: 3000,
         });
       } else {
-        response = await axios.post(`${API_BASE}/categories/category`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        response = await axiosInstance.post('/categories/category', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+});
+
 
         const newCategory = {
           id: response.data.categoryId,
@@ -385,7 +392,8 @@ const Categories = () => {
 
   const confirmDelete = async () => {
     try {
-      await axios.delete(`${API_BASE}/categories/${categoryToDelete}`);
+      await axiosInstance.delete(`/categories/${categoryToDelete}`);
+
       setCategories(categories.filter(cat => cat.id !== categoryToDelete));
       setDeleteConfirmOpen(false);
       setCategoryToDelete(null);

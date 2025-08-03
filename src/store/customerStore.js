@@ -1,24 +1,17 @@
 import { create } from 'zustand';
-import axios from 'axios';
-import useAuthStore from './authStore';
-
-const API_URL = 'https://logistic-project-backend.onrender.com/api/customer';
+import axiosInstance from '../utils/axiosInstance';
 
 const useCustomerStore = create((set, get) => ({
   customers: [],
   loading: false,
   error: null,
-  
+
   fetchCustomers: async () => {
     set({ loading: true, error: null });
     try {
-      const token = useAuthStore.getState().token;
-      const res = await axios.get(API_URL, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await axiosInstance.get('/customer');
       console.log('Customer API response:', res.data);
-      
-      // Handle different response structures
+
       let data = [];
       if (Array.isArray(res.data)) {
         data = res.data;
@@ -27,32 +20,28 @@ const useCustomerStore = create((set, get) => ({
       } else if (res.data.customers && Array.isArray(res.data.customers)) {
         data = res.data.customers;
       }
-      
-      // Ensure discount, wallet, and remainingCredit have default values if not present
+
       const customersWithDefaults = data.map(customer => ({
         ...customer,
         discount: customer.discount ?? 0,
         wallet: customer.wallet ?? 0,
         remainingCredit: customer.remainingCredit ?? 0,
       }));
-      
+
       set({ customers: customersWithDefaults, loading: false });
     } catch (error) {
       console.error('Failed to fetch customers:', error);
-      set({ 
-        customers: [], 
-        loading: false, 
+      set({
+        customers: [],
+        loading: false,
         error: error.response?.data?.message || 'Failed to fetch customers'
       });
     }
   },
 
-  addCustomer: async ({ customerName, email, address, contactNumber, discount, wallet, remainingCredit }) => {
+  addCustomer: async ({ customerName, email, address, contactNumber, discount, wallet, remainingCredit, applyCustomerDiscount }) => {
     set({ loading: true, error: null });
     try {
-      const token = useAuthStore.getState().token;
-      
-      // Prepare the customer data with proper defaults and validation
       const customerData = {
         customerName: customerName.trim(),
         email: email.trim(),
@@ -60,48 +49,35 @@ const useCustomerStore = create((set, get) => ({
         contactNumber: contactNumber.trim(),
         discount: discount ? parseFloat(discount) : 0,
         wallet: wallet ? parseFloat(wallet) : 0,
-        // Sync remainingCredit with wallet if not provided
         remainingCredit: remainingCredit ? parseFloat(remainingCredit) : (wallet ? parseFloat(wallet) : 0),
+        applyCustomerDiscount: !!applyCustomerDiscount,
       };
 
       console.log('Adding customer with data:', customerData);
 
-      await axios.post(API_URL, customerData, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      // Refresh the customer list after successful addition
+      await axiosInstance.post('/customer', customerData);
       await get().fetchCustomers();
       set({ loading: false });
     } catch (error) {
       console.error('Failed to add customer:', error);
-      console.error('Error details:', error.response?.data);
-      set({ 
-        loading: false, 
+      set({
+        loading: false,
         error: error.response?.data?.message || 'Failed to add customer'
       });
       throw error;
     }
   },
 
-  updateCustomer: async (id, { customerName, email, address, contactNumber, discount, wallet, remainingCredit }) => {
+  updateCustomer: async (id, { customerName, email, address, contactNumber, discount, wallet, remainingCredit, applyCustomerDiscount }) => {
     set({ loading: true, error: null });
     try {
-      const token = useAuthStore.getState().token;
-      
-      // Fetch current customer data
       const currentCustomer = get().getCustomerById(id);
       const oldWallet = currentCustomer?.wallet || 0;
       const oldRemainingCredit = currentCustomer?.remainingCredit || 0;
-      
-      // Prepare the customer data with proper defaults and validation
+
       const newWallet = wallet ? parseFloat(wallet) : 0;
       let newRemainingCredit = remainingCredit ? parseFloat(remainingCredit) : newWallet;
-      
-      // If remainingCredit matches old value and wallet has changed, sync with new wallet
+
       if (remainingCredit && parseFloat(remainingCredit) === oldRemainingCredit && newWallet !== oldWallet) {
         newRemainingCredit = newWallet;
       }
@@ -114,25 +90,18 @@ const useCustomerStore = create((set, get) => ({
         discount: discount ? parseFloat(discount) : 0,
         wallet: newWallet,
         remainingCredit: newRemainingCredit,
+        applyCustomerDiscount: !!applyCustomerDiscount,
       };
 
       console.log('Updating customer with ID:', id, 'Data:', customerData);
 
-      await axios.put(`${API_URL}/${id}`, customerData, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      // Refresh the customer list after successful update
+      await axiosInstance.put(`/customer/${id}`, customerData);
       await get().fetchCustomers();
       set({ loading: false });
     } catch (error) {
       console.error('Failed to update customer:', error);
-      console.error('Error details:', error.response?.data);
-      set({ 
-        loading: false, 
+      set({
+        loading: false,
         error: error.response?.data?.message || 'Failed to update customer'
       });
       throw error;
@@ -142,22 +111,14 @@ const useCustomerStore = create((set, get) => ({
   deleteCustomer: async (id) => {
     set({ loading: true, error: null });
     try {
-      const token = useAuthStore.getState().token;
-      
       console.log('Deleting customer with ID:', id);
-
-      await axios.delete(`${API_URL}/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      // Refresh the customer list after successful deletion
+      await axiosInstance.delete(`/customer/${id}`);
       await get().fetchCustomers();
       set({ loading: false });
     } catch (error) {
       console.error('Failed to delete customer:', error);
-      console.error('Error details:', error.response?.data);
-      set({ 
-        loading: false, 
+      set({
+        loading: false,
         error: error.response?.data?.message || 'Failed to delete customer'
       });
       throw error;
@@ -167,38 +128,34 @@ const useCustomerStore = create((set, get) => ({
   updateWalletBalance: async (customerId, amount, operation = 'add') => {
     set({ loading: true, error: null });
     try {
-      const token = useAuthStore.getState().token;
-      
-      console.log(`${operation === 'add' ? 'Adding to' : 'Deducting from'} wallet for customer ${customerId}:`, amount);
-
-      // Fetch current customer data to get existing remainingCredit
       const currentCustomer = get().getCustomerById(customerId);
-      const newWallet = operation === 'add' 
-        ? (currentCustomer?.wallet || 0) + parseFloat(amount)
-        : (currentCustomer?.wallet || 0) - parseFloat(amount);
+      const prevWallet = currentCustomer?.wallet || 0;
+      const prevRemainingCredit = currentCustomer?.remainingCredit ?? 0;
 
-      await axios.patch(`${API_URL}/${customerId}/wallet`, {
+      const newWallet = operation === 'add'
+        ? prevWallet + parseFloat(amount)
+        : prevWallet - parseFloat(amount);
+
+      let updatedRemainingCredit = prevRemainingCredit;
+      if (prevRemainingCredit === prevWallet) {
+        updatedRemainingCredit = newWallet;
+      }
+
+      const payload = {
         amount: parseFloat(amount),
-        operation, // 'add' or 'deduct'
-        // Sync remainingCredit with new wallet value if it matches wallet (indicating no independent updates)
-        remainingCredit: currentCustomer?.remainingCredit === currentCustomer?.wallet 
-          ? newWallet 
-          : currentCustomer?.remainingCredit || 0,
-      }, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      // Refresh the customer list after wallet update
+        operation,
+        remainingCredit: updatedRemainingCredit
+      };
+
+      console.log("🟨 Sending PATCH request with:", payload);
+
+      await axiosInstance.patch(`/customer/${customerId}/wallet`, payload);
       await get().fetchCustomers();
       set({ loading: false });
     } catch (error) {
       console.error('Failed to update wallet balance:', error);
-      console.error('Error details:', error.response?.data);
-      set({ 
-        loading: false, 
+      set({
+        loading: false,
         error: error.response?.data?.message || 'Failed to update wallet balance'
       });
       throw error;
@@ -208,27 +165,18 @@ const useCustomerStore = create((set, get) => ({
   updateDiscount: async (customerId, discount) => {
     set({ loading: true, error: null });
     try {
-      const token = useAuthStore.getState().token;
-      
       console.log('Updating discount for customer', customerId, 'to:', discount);
 
-      await axios.patch(`${API_URL}/${customerId}/discount`, {
+      await axiosInstance.patch(`/customer/${customerId}/discount`, {
         discount: parseFloat(discount),
-      }, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
       });
-      
-      // Refresh the customer list after discount update
+
       await get().fetchCustomers();
       set({ loading: false });
     } catch (error) {
       console.error('Failed to update discount:', error);
-      console.error('Error details:', error.response?.data);
-      set({ 
-        loading: false, 
+      set({
+        loading: false,
         error: error.response?.data?.message || 'Failed to update discount'
       });
       throw error;
