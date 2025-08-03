@@ -85,7 +85,8 @@ const Layout = () => {
   const drawer = (
     <Box
       sx={{
-        height: '100%',
+        height: '100vh',
+         overflowY: 'auto',
         background: 'linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
         color: '#fff',
         display: 'flex',

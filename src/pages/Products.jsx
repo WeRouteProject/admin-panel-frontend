@@ -9,7 +9,8 @@ import {
 import {
   Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, ShoppingCart as ShoppingCartIcon,
   Remove as RemoveIcon, Close as CloseIcon, Category as CategoryIcon, LocalOffer as PriceIcon,
-  Inventory as ProductIcon, Image as ImageIcon, Search as SearchIcon, Clear as ClearIcon
+  Inventory as ProductIcon, Image as ImageIcon, Search as SearchIcon, Clear as ClearIcon,
+  LocalOffer as LocalOfferIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { ToastContainer, toast } from 'react-toastify';
@@ -19,8 +20,8 @@ import useProductStore from '../store/productStore';
 import CardDesign from '../components/CardDesign';
 import { VALID_NAME_REGEX } from '../constants/regex';
 import axios from 'axios';
+import axiosInstance from '../utils/axiosInstance';
 
-const API_BASE = 'https://logistic-project-backend.onrender.com/api';
 
 const PageContainer = styled(Container)(({ theme }) => ({
   paddingTop: theme.spacing(3),
@@ -148,6 +149,55 @@ const LoaderContainer = styled(Box)(({ theme }) => ({
   },
 }));
 
+// ============= Enhanced discount styles ===============
+
+const DiscountTagFloating = styled(Chip)(({ theme }) => ({
+  position: 'absolute',
+  top: theme.spacing(1.5),
+  right: theme.spacing(1.5),
+  zIndex: 2,
+  background: `linear-gradient(0deg, #852a2aff 60%, #a10606ff)`,
+  color: theme.palette.common.white,
+  fontWeight: 700,
+  fontSize: '0.8rem',
+  borderRadius: '8px',
+  boxShadow: '0 2px 6px rgba(231, 139, 139, 0.07)',
+  letterSpacing: 0.6,
+  height: 28,
+  paddingLeft: theme.spacing(1),
+  paddingRight: theme.spacing(1),
+  '& .MuiChip-label': {
+    paddingLeft: 0,
+    paddingRight: 0,
+    fontWeight: 700,
+  }
+}));
+
+const DiscountedPriceBox = styled('div')(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: theme.spacing(1),
+  marginTop: theme.spacing(1),
+  marginBottom: theme.spacing(1),
+}));
+
+const PriceText = styled(Typography)(({ theme }) => ({
+  fontWeight: 800,
+  fontSize: '1.0rem',
+  color: theme.palette.success.dark,
+  letterSpacing: 0.5,
+}));
+
+const OldPrice = styled(Typography)(({ theme }) => ({
+  color: theme.palette.text.disabled,
+  textDecoration: 'line-through',
+  fontSize: '1rem',
+  marginLeft: theme.spacing(0.5),
+  fontWeight: 500,
+}));
+
+// =====================================================
+
 const Products = () => {
   const theme = useTheme();
   const { categoryId } = useParams();
@@ -167,6 +217,7 @@ const Products = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
   const [productStatus, setProductStatus] = useState('active');
+  const [discount, setDiscount] = useState('');
   const { products, fetchProducts, fetchProductById, deleteProduct, saveProduct, loading } = useProductStore();
   const cart = useCartStore((state) => state.cart);
   const addToCart = useCartStore((state) => state.addToCart);
@@ -182,7 +233,8 @@ const Products = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await axios.get(`${API_BASE}/categories`);
+        const res = await axiosInstance.get('/categories');
+
         setCategories(res.data.filter(cat => cat.status === true));
       } catch (error) {
         console.error('Error fetching categories:', error);
@@ -207,6 +259,11 @@ const Products = () => {
     return item ? item.quantity : 0;
   };
 
+  const calculateDiscountedPrice = (price, discount) => {
+    if (!discount || discount <= 0 || discount >= 100) return price;
+    return (price * (100 - discount) / 100).toFixed(2);
+  };
+
   const handleCartClick = async (product) => {
     if (product.status === false) {
       toast.error('Cannot add inactive product to cart!', {
@@ -217,7 +274,10 @@ const Products = () => {
     }
     const currentQty = getQuantity(product.productId);
     if (currentQty === 0) {
-      await addToCart(product);
+      await addToCart({
+        ...product,
+        discountedPrice: calculateDiscountedPrice(product.price, product.discount)
+      });
       toast.success(`"${product.productName}" added to cart!`, {
         position: 'top-right',
         autoClose: 3000,
@@ -288,6 +348,7 @@ const Products = () => {
       setEditProductId(productId);
       setProductName(product.productName);
       setDescription(product.description);
+      setDiscount(product.discount || '');
       setPrice(product.price);
       setProductStatus(product.status === true ? 'active' : 'inactive');
       if (isAllProductsPage) {
@@ -325,11 +386,20 @@ const Products = () => {
       return;
     }
 
+    if (discount && (isNaN(discount) || discount < 0 || discount > 100)) {
+      toast.error('Discount must be a number between 0 and 100.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+
     // Check if the selected category is active
     if (productStatus === 'active') {
       try {
         const categoryToCheck = isAllProductsPage ? selectedCategory : categoryId;
-        const categoryResponse = await axios.get(`${API_BASE}/categories/${categoryToCheck}`);
+        const categoryResponse = await axiosInstance.get(`/categories/${categoryToCheck}`);
+
         if (categoryResponse.data.status === false) {
           toast.error('Cannot set product to active: the selected category is inactive.', {
             position: 'top-right',
@@ -353,6 +423,7 @@ const Products = () => {
         productName,
         description,
         price: parseFloat(price),
+        discount: discount ? parseFloat(discount) : undefined,
         categoryId: isAllProductsPage ? parseInt(selectedCategory) : parseInt(categoryId),
         image,
         isEditing,
@@ -363,6 +434,7 @@ const Products = () => {
       setProductName('');
       setDescription('');
       setPrice('');
+      setDiscount('');
       setImage(null);
       setSelectedCategory('');
       setEditProductId(null);
@@ -387,6 +459,7 @@ const Products = () => {
     setProductName('');
     setDescription('');
     setPrice('');
+    setDiscount('');
     setImage(null);
     setSelectedCategory('');
     setEditProductId(null);
@@ -407,6 +480,7 @@ const Products = () => {
     setProductName('');
     setDescription('');
     setPrice('');
+    setDiscount('');
     setImage(null);
     setSelectedCategory('');
     
@@ -414,7 +488,8 @@ const Products = () => {
     try {
       const categoryToCheck = isAllProductsPage ? selectedCategory : categoryId;
       if (categoryToCheck) {
-        const categoryResponse = await axios.get(`${API_BASE}/categories/${categoryToCheck}`);
+        const categoryResponse = await axiosInstance.get(`/categories/${categoryToCheck}`);
+
         setProductStatus(categoryResponse.data.status === true ? 'active' : 'inactive');
       } else {
         setProductStatus('active'); // Default to active if no category selected yet
@@ -432,7 +507,8 @@ const Products = () => {
     if (isAllProductsPage && selectedCategory && !isEditing) {
       const fetchCategoryStatus = async () => {
         try {
-          const categoryResponse = await axios.get(`${API_BASE}/categories/${selectedCategory}`);
+          const categoryResponse = await axiosInstance.get(`/categories/${selectedCategory}`);
+
           setProductStatus(categoryResponse.data.status === true ? 'active' : 'inactive');
         } catch (error) {
           console.error('Error fetching category status:', error);
@@ -538,10 +614,20 @@ const Products = () => {
             <Grid item key={product.productId}>
               <Box
                 sx={{
+                  position: 'relative', // important for floating badge
                   opacity: product.status === false ? 0.5 : 1,
                   filter: product.status === false ? 'grayscale(1)' : 'none',
                 }}
               >
+                {/* Floating Discount Tag at top-right */}
+                {product.discount > 0 && (
+                  <DiscountTagFloating
+                    label={`${product.discount}% OFF`}
+                    size="small"
+                    
+                  />
+                )}
+
                 <CardDesign
                   imageUrl={product.imageUrl}
                   placeholderText="No Image"
@@ -648,16 +734,22 @@ const Products = () => {
                     >
                       {product.description}
                     </Typography>
-                    <Chip
-                      icon={<PriceIcon />}
-                      label={`₹ ${product.price}`}
-                      size="small"
-                      sx={{
-                        background: theme.palette.grey[100],
-                        color: theme.palette.text.primary,
-                        fontWeight: 'medium',
-                      }}
-                    />
+                    <DiscountedPriceBox>
+                      {product.discount ? (
+                        <>
+                          <PriceText>
+                            ₹ {calculateDiscountedPrice(product.price, product.discount)}
+                          </PriceText>
+                          <OldPrice>
+                            ₹ {product.price}
+                          </OldPrice>
+                        </>
+                      ) : (
+                        <PriceText>
+                          ₹ {product.price}
+                        </PriceText>
+                      )}
+                    </DiscountedPriceBox>
                   </CardContent>
                 </CardDesign>
               </Box>
@@ -732,6 +824,42 @@ const Products = () => {
               }
             }}
           />
+          <TextField
+            fullWidth
+            type="number"
+            label="Discount (%)"
+            value={discount}
+            onChange={(e) => setDiscount(e.target.value)}
+            variant="outlined"
+            size="medium"
+            sx={{
+              mb: 3,
+              '& .MuiOutlinedInput-root': {
+                borderRadius: '8px',
+              }
+            }}
+            inputProps={{ min: 0, max: 100 }}
+          />
+
+          <TextField
+  fullWidth
+  label="Discounted Price (₹)"
+  value={
+    price && discount
+      ? (
+          !isNaN(price) && !isNaN(discount)
+            ? (price * (100 - discount) / 100).toFixed(2)
+            : ''
+        )
+      : price ? price : ''
+  }
+  variant="outlined"
+  size="medium"
+  sx={{ mb: 3, '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
+  InputProps={{ readOnly: true }}
+  disabled
+/>
+
           <FormControl component="fieldset" sx={{ mb: 3, width: '100%' }}>
             <FormLabel
               component="legend"

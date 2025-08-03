@@ -1,9 +1,17 @@
+// src/components/ProtectedRoute.jsx
 import { Navigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 
-const ProtectedRoute = ({ children }) => {
+function ProtectedRoute({ children }) {
   const token = useAuthStore((state) => state.token);
-  return token ? children : <Navigate to="/login" />;
-};
+
+  // token === null means still loading/hydrating Zustand store
+
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
 
 export default ProtectedRoute;

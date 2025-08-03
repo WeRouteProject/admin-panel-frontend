@@ -17,7 +17,7 @@ import useCustomerStore from '../store/customerStore';
 import { useAssignDeliveryStore } from '../store/assignDeliveryStore';
 import useProductStore from '../store/productStore';
 
-const API_BASE = 'https://logistic-project-backend.onrender.com/api';
+const API_BASE = 'http://35.170.21.202:3000/api';
 
 const Cart = () => {
   const cart = useCartStore((state) => state.cart);
@@ -53,6 +53,7 @@ const Cart = () => {
     if (imagePath.startsWith('http')) return imagePath;
     return `${API_BASE}/${imagePath}`;
   };
+  
 
   useEffect(() => {
     const fetchProductDetails = async () => {
@@ -147,6 +148,25 @@ const Cart = () => {
   }
 }, [selectedCustomerId, customers, subtotal]);
 
+const selectedCustomer = customers.find(c => c.customerId === selectedCustomerId);
+const applyCustomerDiscount = selectedCustomer?.applyCustomerDiscount ?? false;
+
+const totalBeforeDiscount = cart.reduce((sum, item) => {
+  const basePrice = Number(item.price || 0); // original price
+  const quantity = Number(item.quantity || 1);
+  return sum + basePrice * quantity;
+}, 0);
+
+const totalProductLevelDiscounted = cart.reduce((sum, item) => {
+  const discounted = Number(item.discountedPrice || item.price || 0);
+  const quantity = Number(item.quantity || 1);
+  return sum + discounted * quantity;
+}, 0);
+
+// Decide which discount to apply in UI
+const finalDiscountedPrice = applyCustomerDiscount ? discountedPrice : totalProductLevelDiscounted;
+
+
   const handleUpdateQuantity = async (productId, delta) => {
     try {
       await updateQuantity(productId, delta);
@@ -200,19 +220,23 @@ const Cart = () => {
       });
       return;
     }
+const applyCustomerDiscount = selectedCustomer?.applyCustomerDiscount ?? false;
 
     const payload = {
-      cartItems: cart.map((item) => ({ cartItemId: item.cartItemId })),
-      deliveryBoyId: Number(agent),
-      customerName,
-      customerNumber: customerPhone,
-      customerEmail,
-      deliveryDate: new Date(deliveryDate).toISOString(),
-      status: 'ASSIGNED',
-      deliveryAddress: address,
-      discountedPrice: Number(discountedPrice.toFixed(2)),
-      customerId: selectedCustomerId
-    };
+  cartItems: cart.map((item) => ({ cartItemId: item.cartItemId })),
+  deliveryBoyId: Number(agent),
+  customerName,
+  customerNumber: customerPhone,
+  customerEmail,
+  deliveryDate: new Date(deliveryDate).toISOString(),
+  status: 'ASSIGNED',
+  deliveryAddress: address,
+  discountedPrice: Number(discountedPrice.toFixed(2)),
+  customerId: selectedCustomerId,
+  applyCustomerDiscount 
+};
+
+
 
     try {
       await assignDelivery(payload);
@@ -282,9 +306,13 @@ const Cart = () => {
           <Grid container spacing={3} sx={{ mb: 3 }}>
             {cart.map((item, index) => {
               const uniqueKey = `${item.productId}-${index}`;
-              const price = Number(item.price) || 0;
-              const quantity = Number(item.quantity) || 0;
-              const total = price * quantity;
+
+             
+const price = Number(item.price) || 0;
+const discounted = Number(item.discountedPrice || 0);
+const quantity = Number(item.quantity) || 0;
+const finalPrice = discounted && discounted < price ? discounted : price;
+const total = finalPrice * quantity;
               const product = productDetails[item.productId] || {};
               const productName = item.productName || product.productName || item.name || 'Unknown Product';
               const productImage = item.imageUrl ? getImageUrl(item.imageUrl) : product.imageUrl || 'https://via.placeholder.com/150';
@@ -341,9 +369,22 @@ const Cart = () => {
                     </Box>
 
                     <Box sx={{ flexGrow: 1 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Price: ₹{price.toFixed(2)}
-                      </Typography>
+                      {discounted && discounted < price ? (
+  <Box display="flex" alignItems="center" gap={1}>
+    <Typography variant="h6" color="success.main" fontWeight="bold">
+      ₹ {discounted.toFixed(2)}
+    </Typography>
+    <Typography variant="body2" color="text.disabled" sx={{ textDecoration: 'line-through' }}>
+      ₹ {price.toFixed(2)}
+    </Typography>
+  </Box>
+) : (
+  <Typography variant="body2" color="text.secondary">
+    Price: ₹ {price.toFixed(2)}
+  </Typography>
+)}
+
+
                       <Box display="flex" alignItems="center" my={1}>
                         <IconButton
                           size="small"
@@ -365,8 +406,8 @@ const Cart = () => {
                         </IconButton>
                       </Box>
                       <Typography variant="body2" fontWeight="600">
-                        TOTAL: ₹{total.toFixed(2)}
-                      </Typography>
+  TOTAL: ₹{total.toFixed(2)}
+</Typography>
                     </Box>
 
                     <Box sx={{ flexShrink: 0 }}>
@@ -572,100 +613,114 @@ const Cart = () => {
           </Card>
 
           <Paper elevation={1} sx={{ p: 3, bgcolor: 'grey.50' }}>
-            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2}>
-              <Box>
-                <Typography variant="h5" fontWeight="600" color="primary.main">
-                  Total: ₹{subtotal.toFixed(2)}
-                </Typography>
-                {customerName && selectedCustomerId && (
-                  <Typography variant="h6" fontWeight="500" color={discountPercentage > 0 ? "success.main" : "text.secondary"}>
-                    {discountPercentage > 0 
-                      ? `Discounted price after ${discountPercentage}% is: ₹${discountedPrice.toFixed(2)}`
-                      : "No discount available"}
-                  </Typography>
-                )}
-                <Typography variant="body2" color="text.secondary">
-                  {cart.length} items in cart
-                </Typography>
-              </Box>
-              <Button
-                variant="contained"
-                size="large"
-                onClick={handleCheckout}
-                disabled={!customerName || !address || !deliveryDate || !agent || cart.length === 0 || isCheckoutLoading}
-                startIcon={isCheckoutLoading ? <CircularProgress size={20} /> : <CheckIcon />}
-                sx={{ px: 4, py: 1.5, minWidth: 160 }}
-              >
-                {isCheckoutLoading ? 'Processing...' : 'Assign Order'}
-              </Button>
-            </Stack>
-          </Paper>
+  <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2}>
+    <Box>
+      <Typography variant="h6" fontWeight="500" color="text.secondary">
+        Total Before Discount: ₹{totalBeforeDiscount.toFixed(2)}
+      </Typography>
+
+      <Typography variant="h5" fontWeight="600" color="primary.main">
+        Final Price After Discount: ₹{finalDiscountedPrice.toFixed(2)}
+      </Typography>
+
+      {customerName && selectedCustomerId && (
+        <Typography variant="body2" color="info.main">
+          {applyCustomerDiscount
+            ? "Customer-level discount applied"
+            : "Product-level discount applied"}
+        </Typography>
+      )}
+
+      <Typography variant="body2" color="text.secondary">
+        {cart.length} items in cart
+      </Typography>
+    </Box>
+
+    <Button
+      variant="contained"
+      size="large"
+      onClick={handleCheckout}
+      disabled={!customerName || !address || !deliveryDate || !agent || cart.length === 0 || isCheckoutLoading}
+      startIcon={isCheckoutLoading ? <CircularProgress size={20} /> : <CheckIcon />}
+      sx={{ px: 4, py: 1.5, minWidth: 160 }}
+    >
+      {isCheckoutLoading ? 'Processing...' : 'Assign Order'}
+    </Button>
+  </Stack>
+</Paper>
+
+
         </>
       )}
 
-      <Dialog open={showModal} onClose={() => {if (!isCheckoutLoading) setShowModal(false)}} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          <Box display="flex" alignItems="center" gap={2}>
-            <CheckIcon color="success" />
-            <Typography variant="h6">Confirm Order</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={2}>
-            <Box display="flex" justifyContent="space-between">
-              <Typography variant="body1" fontWeight="500">Customer:</Typography>
-              <Typography variant="body1">{customerName}</Typography>
-            </Box>
-            <Divider />
-            <Box display="flex" justifyContent="space-between">
-              <Typography variant="body1" fontWeight="500">Agent:</Typography>
-              <Typography variant="body1">
-                {deliveryAgents.find(a => a.userId == agent)?.username || agent}
-              </Typography>
-            </Box>
-            <Divider />
-            <Box display="flex" justifyContent="space-between">
-              <Typography variant="body1" fontWeight="500">Delivery Date:</Typography>
-              <Typography variant="body1">{deliveryDate}</Typography>
-            </Box>
-            <Divider />
-            <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-              <Typography variant="body1" fontWeight="500">Address:</Typography>
-              <Typography variant="body1" textAlign="right" sx={{ maxWidth: '60%' }}>
-                {address}
-              </Typography>
-            </Box>
-            <Divider />
-            <Box display="flex" justifyContent="space-between">
-              <Typography variant="body1" fontWeight="500">Total:</Typography>
-              <Typography variant="body1">₹{subtotal.toFixed(2)}</Typography>
-            </Box>
-            {customerName && selectedCustomerId && (
-              <Box display="flex" justifyContent="space-between">
-                <Typography variant="body1" fontWeight="500">Discounted Price:</Typography>
-                <Typography variant="body1" color={discountPercentage > 0 ? "success.main" : "text.secondary"}>
-                  {discountPercentage > 0 
-                    ? `After ${discountPercentage}%: ₹${discountedPrice.toFixed(2)}`
-                    : "No discount available"}
-                </Typography>
-              </Box>
-            )}
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => {if (!isCheckoutLoading) setShowModal(false)}} variant="outlined" disabled={isCheckoutLoading}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConfirmOrder}
-            variant="contained"
-            disabled={isCheckoutLoading}
-            startIcon={isCheckoutLoading ? <CircularProgress size={16} /> : null}
-          >
-            {isCheckoutLoading ? 'Processing...' : 'Confirm Order'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <Dialog open={showModal} onClose={() => { if (!isCheckoutLoading) setShowModal(false) }} maxWidth="sm" fullWidth>
+  <DialogTitle>
+    <Box display="flex" alignItems="center" gap={2}>
+      <CheckIcon color="success" />
+      <Typography variant="h6">Confirm Order</Typography>
+    </Box>
+  </DialogTitle>
+  <DialogContent>
+  <Stack spacing={2}>
+    <Box display="flex" justifyContent="space-between">
+      <Typography variant="body1" fontWeight="500">Customer:</Typography>
+      <Typography variant="body1">{customerName}</Typography>
+    </Box>
+    <Divider />
+    <Box display="flex" justifyContent="space-between">
+      <Typography variant="body1" fontWeight="500">Agent:</Typography>
+      <Typography variant="body1">
+        {deliveryAgents.find(a => a.userId == agent)?.username || agent}
+      </Typography>
+    </Box>
+    <Divider />
+    <Box display="flex" justifyContent="space-between">
+      <Typography variant="body1" fontWeight="500">Delivery Date:</Typography>
+      <Typography variant="body1">{deliveryDate}</Typography>
+    </Box>
+    <Divider />
+    <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+      <Typography variant="body1" fontWeight="500">Address:</Typography>
+      <Typography variant="body1" textAlign="right" sx={{ maxWidth: '60%' }}>
+        {address}
+      </Typography>
+    </Box>
+    <Divider />
+    <Box display="flex" justifyContent="space-between">
+      <Typography variant="body1" fontWeight="500">Total Before Discount:</Typography>
+      <Typography variant="body1">₹{totalBeforeDiscount.toFixed(2)}</Typography>
+    </Box>
+    <Box display="flex" justifyContent="space-between">
+      <Typography variant="body1" fontWeight="500">Final Price After Discount:</Typography>
+      <Typography variant="body1" color="success.main">
+        ₹{finalDiscountedPrice.toFixed(2)}
+      </Typography>
+    </Box>
+    <Box display="flex" justifyContent="space-between">
+      <Typography variant="body2" color="info.main">
+        {applyCustomerDiscount
+          ? "Customer-level discount applied"
+          : "Product-level discount applied"}
+      </Typography>
+    </Box>
+  </Stack>
+</DialogContent>
+
+  <DialogActions sx={{ p: 3 }}>
+    <Button onClick={() => { if (!isCheckoutLoading) setShowModal(false) }} variant="outlined" disabled={isCheckoutLoading}>
+      Cancel
+    </Button>
+    <Button
+      onClick={handleConfirmOrder}
+      variant="contained"
+      disabled={isCheckoutLoading}
+      startIcon={isCheckoutLoading ? <CircularProgress size={16} /> : null}
+    >
+      {isCheckoutLoading ? 'Processing...' : 'Confirm Order'}
+    </Button>
+  </DialogActions>
+</Dialog>
+
 
       <ToastContainer position="top-right" autoClose={3000} style={{ top: '80px' }} toastStyle={{ zIndex: 10000 }} />
     </Container>

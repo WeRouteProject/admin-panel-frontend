@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import axios from 'axios';
-import useAuthStore from './authStore';
+import axiosInstance from '../utils/axiosInstance';
 
 const useOrderStore = create(
   persist(
@@ -15,18 +14,10 @@ const useOrderStore = create(
       error: null,
 
       fetchOrders: async () => {
-        const token = useAuthStore.getState().token;
         set({ loading: true, error: null });
 
         try {
-          const response = await axios.get(
-            'https://logistic-project-backend.onrender.com/api/delivery/all',
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
+          const response = await axiosInstance.get('/delivery/all'); // ✅ use instance
 
           const data = response.data || [];
 

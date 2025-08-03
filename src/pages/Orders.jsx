@@ -62,7 +62,7 @@ const StyledTableCellBody = styled(TableCell)(({ theme }) => ({
   whiteSpace: 'nowrap',
   textOverflow: 'ellipsis',
   overflow: 'hidden',
-  maxWidth: 0, // This allows text-overflow to work
+  maxWidth: 0, 
   '&.compact': {
     padding: theme.spacing(0.5, 1),
     fontSize: '0.75rem',
