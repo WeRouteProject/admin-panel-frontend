@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Switch } from '@mui/material';
+import { Visibility } from '@mui/icons-material';
 import {
   Container,
   Box,
@@ -20,40 +21,69 @@ import {
   Grid,
   InputAdornment,
 } from '@mui/material';
-import { 
-  Add, 
-  Edit, 
-  Delete, 
-  PersonAdd, 
-  Email, 
-  Phone, 
-  LocationOn, 
-  Close, 
-  Percent, 
-  AccountBalanceWallet 
+import {
+  Add,
+  Edit,
+  Delete,
+  PersonAdd,
+  Email,
+  Phone,
+  LocationOn,
+  Close,
+  Percent,
+  AccountBalanceWallet
 } from '@mui/icons-material';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import useCustomerStore from '../store/customerStore';
+import useCustomerStore, { getCustomerStoreState } from '../store/customerStore';
 import { VALID_NAME_REGEX, VALID_EMAIL_REGEX } from '../constants/regex';
 
+
 const Customer = () => {
-  const { customers, fetchCustomers, addCustomer, updateCustomer, deleteCustomer, getCustomerById } = useCustomerStore();
+  const { customers, fetchCustomers, addCustomer, updateCustomer, deleteCustomer, getCustomerById, fetchWalletHistory,walletHistory, } = useCustomerStore();
+  // ✅ Local state
+  const [selectedWalletHistory, setSelectedWalletHistory] = useState([]);
+  const [walletModalOpen, setWalletModalOpen] = useState(false);
+  const [selectedCustomerName, setSelectedCustomerName] = useState('');
+
+  // ✅ Your function – correct place
+  const handleViewWalletHistory = async (customerId, customerName) => {
+  try {
+    await useCustomerStore.getState().fetchWalletHistory(customerId);
+
+    const updatedHistory = getCustomerStoreState().walletHistory[customerId] || [];
+
+    setSelectedWalletHistory(updatedHistory);
+    setSelectedCustomerName(customerName);
+    setWalletModalOpen(true);
+  } catch (error) {
+    console.error('Wallet history fetch failed:', error);
+    toast.error('Failed to fetch wallet history.', {
+      position: 'top-right',
+      autoClose: 3000,
+    });
+  }
+};
+
+
+
   const [openModal, setOpenModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editingCustomerId, setEditingCustomerId] = useState(null);
   const [form, setForm] = useState({
-  customerName: '',
-  email: '',
-  contactNumber: '',
-  address: '',
-  discount: '',
-  wallet: '',
-  remainingCredit: '',
-  applyCustomerDiscount: false,
-});
+    customerName: '',
+    email: '',
+    contactNumber: '',
+    address: '',
+    discount: '',
+    wallet: '',
+    remainingCredit: '',
+    applyCustomerDiscount: false,
+  });
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState(null);
+
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -158,14 +188,14 @@ const Customer = () => {
           autoClose: 3000,
         });
       }
-      setForm({ 
-        customerName: '', 
-        email: '', 
-        contactNumber: '', 
-        address: '', 
-        discount: '', 
-        wallet: '', 
-        remainingCredit: '' 
+      setForm({
+        customerName: '',
+        email: '',
+        contactNumber: '',
+        address: '',
+        discount: '',
+        wallet: '',
+        remainingCredit: ''
       });
       setEditMode(false);
       setEditingCustomerId(null);
@@ -179,20 +209,22 @@ const Customer = () => {
   };
 
   const handleEdit = (customer) => {
-    setForm({
-      customerName: customer.customerName,
-      email: customer.email,
-      contactNumber: customer.contactNumber,
-      address: customer.address,
-      discount: customer.discount || '',
-      wallet: customer.wallet || '',
-      remainingCredit: customer.remainingCredit || '',
-      applyCustomerDiscount: customer.applyCustomerDiscount || false,
-    });
-    setEditingCustomerId(customer.customerId);
-    setEditMode(true);
-    setOpenModal(true);
-  };
+  setForm({
+    customerName: customer.customerName,
+    email: customer.email,
+    contactNumber: customer.contactNumber,
+    address: customer.address,
+    discount: customer.discount || '',
+    wallet: customer.wallet || '',
+    remainingCredit: customer.remainingCredit || '',
+    applyCustomerDiscount: customer.applyCustomerDiscount || false,
+  });
+  setEditingCustomerId(customer.customerId);
+  setEditMode(true);
+  setOpenModal(true);
+};
+
+
 
   const handleDelete = (id) => {
     setCustomerToDelete(id);
@@ -240,14 +272,14 @@ const Customer = () => {
           color="primary"
           startIcon={<Add />}
           onClick={() => {
-            setForm({ 
-              customerName: '', 
-              email: '', 
-              contactNumber: '', 
-              address: '', 
-              discount: '', 
-              wallet: '', 
-              remainingCredit: '' 
+            setForm({
+              customerName: '',
+              email: '',
+              contactNumber: '',
+              address: '',
+              discount: '',
+              wallet: '',
+              remainingCredit: ''
             });
             setEditMode(false);
             setEditingCustomerId(null);
@@ -274,6 +306,8 @@ const Customer = () => {
                 <TableCell sx={{ fontWeight: 'bold' }}>Discount (%)</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Wallet Balance</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Remaining Credit</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Wallet History</TableCell>
+
                 <TableCell sx={{ fontWeight: 'bold' }}>Apply Discount</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', width: 120 }}>Actions</TableCell>
               </TableRow>
@@ -303,6 +337,16 @@ const Customer = () => {
                       {customer.remainingCredit}
                     </Box>
                   </TableCell>
+                  <TableCell>
+                    <IconButton
+                      color="info"
+                      onClick={() => handleViewWalletHistory(customer.customerId, customer.customerName)}
+                      size="small"
+                    >
+                      <Visibility />
+                    </IconButton>
+                  </TableCell>
+
                   <TableCell>{customer.applyCustomerDiscount ? 'Yes' : 'No'}</TableCell>
 
                   <TableCell>
@@ -331,176 +375,176 @@ const Customer = () => {
       </TableContainer>
 
       <Modal
-    open={openModal}
-    onClose={() => setOpenModal(false)}
-    aria-labelledby="customer-modal-title"
-  >
-    <Box
-      sx={{
-        position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        width: { xs: '95%', sm: '90%', md: 600 },
-        bgcolor: 'background.paper',
-        boxShadow: 24,
-        p: 4,
-        borderRadius: 2,
-        maxHeight: '90vh',
-        overflowY: 'auto',
-      }}
-    >
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
-        <Typography id="customer-modal-title" variant="h6" component="h2">
-          {editMode ? 'Edit Customer' : 'Add New Customer'}
-        </Typography>
-        <IconButton
-          onClick={() => setOpenModal(false)}
-          size="small"
-          sx={{ color: 'grey.500' }}
+        open={openModal}
+        onClose={() => setOpenModal(false)}
+        aria-labelledby="customer-modal-title"
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: { xs: '95%', sm: '90%', md: 600 },
+            bgcolor: 'background.paper',
+            boxShadow: 24,
+            p: 4,
+            borderRadius: 2,
+            maxHeight: '90vh',
+            overflowY: 'auto',
+          }}
         >
-          <Close />
-        </IconButton>
-      </Stack>
-      <form onSubmit={handleSubmit}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} sm={6} md={4}>
-            <TextField
-              label="Name *"
-              name="customerName"
-              value={form.customerName}
-              onChange={handleInputChange}
-              required
-              fullWidth
-              InputProps={{
-                startAdornment: <PersonAdd sx={{ mr: 1, color: 'text.secondary' }} />,
-              }}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <TextField
-              label="Email *"
-              name="email"
-              type="email"
-              value={form.email}
-              onChange={handleInputChange}
-              required
-              fullWidth
-              InputProps={{
-                startAdornment: <Email sx={{ mr: 1, color: 'text.secondary' }} />,
-              }}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <TextField
-              label="Phone *"
-              name="contactNumber"
-              value={form.contactNumber}
-              onChange={handleInputChange}
-              required
-              fullWidth
-              InputProps={{
-                startAdornment: <Phone sx={{ mr: 1, color: 'text.secondary' }} />,
-              }}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <TextField
-              label="Discount (%)"
-              name="discount"
-              type="number"
-              value={form.discount}
-              onChange={handleInputChange}
-              fullWidth
-              inputProps={{ min: 0, max: 100, step: 0.01 }}
-              InputProps={{
-                startAdornment: <Percent sx={{ mr: 1, color: 'text.secondary' }} />,
-              }}
-              helperText="Enter discount percentage (0-100)"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <TextField
-              label="Wallet Balance"
-              name="wallet"
-              type="number"
-              value={form.wallet}
-              onChange={handleInputChange}
-              fullWidth
-              inputProps={{ min: 0, step: 0.01 }}
-              InputProps={{
-                startAdornment: <AccountBalanceWallet sx={{ mr: 1, color: 'text.secondary' }} />,
-              }}
-              helperText="Enter wallet balance amount"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <TextField
-              label="Remaining Credit"
-              name="remainingCredit"
-              type="number"
-              value={form.remainingCredit}
-              onChange={handleInputChange}
-              fullWidth
-              inputProps={{ min: 0, step: 0.01 }}
-              InputProps={{
-                startAdornment: <AccountBalanceWallet sx={{ mr: 1, color: 'text.secondary' }} />,
-              }}
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
+            <Typography id="customer-modal-title" variant="h6" component="h2">
+              {editMode ? 'Edit Customer' : 'Add New Customer'}
+            </Typography>
+            <IconButton
+              onClick={() => setOpenModal(false)}
+              size="small"
+              sx={{ color: 'grey.500' }}
+            >
+              <Close />
+            </IconButton>
+          </Stack>
+          <form onSubmit={handleSubmit}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6} md={4}>
+                <TextField
+                  label="Name *"
+                  name="customerName"
+                  value={form.customerName}
+                  onChange={handleInputChange}
+                  required
+                  fullWidth
+                  InputProps={{
+                    startAdornment: <PersonAdd sx={{ mr: 1, color: 'text.secondary' }} />,
+                  }}
                 />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-  <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-    <Typography variant="body1" sx={{ mr: 2 }}>
-      Apply Discount
-    </Typography>
-    <Switch
-      checked={form.applyCustomerDiscount}
-      onChange={(e) =>
-        setForm((prev) => ({
-          ...prev,
-          applyCustomerDiscount: e.target.checked,
-        }))
-      }
-      color="primary"
-    />
-  </Box>
-</Grid>
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <TextField
+                  label="Email *"
+                  name="email"
+                  type="email"
+                  value={form.email}
+                  onChange={handleInputChange}
+                  required
+                  fullWidth
+                  InputProps={{
+                    startAdornment: <Email sx={{ mr: 1, color: 'text.secondary' }} />,
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <TextField
+                  label="Phone *"
+                  name="contactNumber"
+                  value={form.contactNumber}
+                  onChange={handleInputChange}
+                  required
+                  fullWidth
+                  InputProps={{
+                    startAdornment: <Phone sx={{ mr: 1, color: 'text.secondary' }} />,
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <TextField
+                  label="Discount (%)"
+                  name="discount"
+                  type="number"
+                  value={form.discount}
+                  onChange={handleInputChange}
+                  fullWidth
+                  inputProps={{ min: 0, max: 100, step: 0.01 }}
+                  InputProps={{
+                    startAdornment: <Percent sx={{ mr: 1, color: 'text.secondary' }} />,
+                  }}
+                  helperText="Enter discount percentage (0-100)"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <TextField
+                  label="Wallet Balance"
+                  name="wallet"
+                  type="number"
+                  value={form.wallet}
+                  onChange={handleInputChange}
+                  fullWidth
+                  inputProps={{ min: 0, step: 0.01 }}
+                  InputProps={{
+                    startAdornment: <AccountBalanceWallet sx={{ mr: 1, color: 'text.secondary' }} />,
+                  }}
+                  helperText="Enter wallet balance amount"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <TextField
+                  label="Remaining Credit"
+                  name="remainingCredit"
+                  type="number"
+                  value={form.remainingCredit}
+                  onChange={handleInputChange}
+                  fullWidth
+                  inputProps={{ min: 0, step: 0.01 }}
+                  InputProps={{
+                    startAdornment: <AccountBalanceWallet sx={{ mr: 1, color: 'text.secondary' }} />,
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+                  <Typography variant="body1" sx={{ mr: 2 }}>
+                    Apply Discount
+                  </Typography>
+                  <Switch
+                    checked={form.applyCustomerDiscount}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        applyCustomerDiscount: e.target.checked,
+                      }))
+                    }
+                    color="primary"
+                  />
+                </Box>
+              </Grid>
 
-          <Grid item xs={12} sm={12} md={12}>
-            <TextField
-              label="Address *"
-              name="address"
-              value={form.address}
-              onChange={handleInputChange}
-              required
-              width="100%"
-              multiline
-              rows={2}
-              InputProps={{
-                startAdornment: <LocationOn sx={{ mr: 1, color: 'text.secondary', alignSelf: 'flex-start', mt: 1 }} />,
-              }}
-            />
-          </Grid>
-        </Grid>
-        <Divider sx={{ my: 3 }} />
-        <Stack direction="row" spacing={2} justifyContent="flex-end">
-          <Button
-            variant="outlined"
-            onClick={() => setOpenModal(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            variant="contained"
-            color="primary"
-          >
-            {editMode ? 'Update' : 'Add'} Customer
-          </Button>
-        </Stack>
-      </form>
-    </Box>
-  </Modal>
+              <Grid item xs={12} sm={12} md={12}>
+                <TextField
+                  label="Address *"
+                  name="address"
+                  value={form.address}
+                  onChange={handleInputChange}
+                  required
+                  width="100%"
+                  multiline
+                  rows={2}
+                  InputProps={{
+                    startAdornment: <LocationOn sx={{ mr: 1, color: 'text.secondary', alignSelf: 'flex-start', mt: 1 }} />,
+                  }}
+                />
+              </Grid>
+            </Grid>
+            <Divider sx={{ my: 3 }} />
+            <Stack direction="row" spacing={2} justifyContent="flex-end">
+              <Button
+                variant="outlined"
+                onClick={() => setOpenModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+              >
+                {editMode ? 'Update' : 'Add'} Customer
+              </Button>
+            </Stack>
+          </form>
+        </Box>
+      </Modal>
 
 
       <Modal
@@ -552,6 +596,65 @@ const Customer = () => {
               Delete
             </Button>
           </Stack>
+        </Box>
+      </Modal>
+      <Modal
+        open={walletModalOpen}
+        onClose={() => setWalletModalOpen(false)}
+        aria-labelledby="wallet-history-modal-title"
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: { xs: '95%', sm: '90%', md: 600 },
+            bgcolor: 'background.paper',
+            boxShadow: 24,
+            p: 4,
+            borderRadius: 2,
+            maxHeight: '80vh',
+            overflowY: 'auto',
+          }}
+        >
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+            <Typography id="wallet-history-modal-title" variant="h6" component="h2">
+              Wallet History for {selectedCustomerName}
+            </Typography>
+            <IconButton onClick={() => setWalletModalOpen(false)} size="small">
+              <Close />
+            </IconButton>
+          </Stack>
+
+          {selectedWalletHistory.length === 0 ? (
+            <Typography variant="body1" color="text.secondary">
+              No wallet history found.
+            </Typography>
+          ) : (
+            <TableContainer component={Paper}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell><strong>Date</strong></TableCell>
+                    <TableCell><strong>Type</strong></TableCell>
+                    <TableCell><strong>Amount</strong></TableCell>
+                    <TableCell><strong>Description</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+  {selectedWalletHistory.map((entry, idx) => (
+    <TableRow key={idx}>
+      <TableCell>{new Date(entry.createdAt).toLocaleString()}</TableCell>
+      <TableCell>{entry.type}</TableCell>
+      <TableCell>{entry.amount}</TableCell>
+      <TableCell>{entry.reason}</TableCell>
+    </TableRow>
+  ))}
+</TableBody>
+              </Table>
+            </TableContainer>
+          )}
         </Box>
       </Modal>
 
