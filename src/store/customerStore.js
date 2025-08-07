@@ -5,6 +5,7 @@ const useCustomerStore = create((set, get) => ({
   customers: [],
   loading: false,
   error: null,
+  walletHistory: {},
 
   fetchCustomers: async () => {
     set({ loading: true, error: null });
@@ -35,6 +36,30 @@ const useCustomerStore = create((set, get) => ({
         customers: [],
         loading: false,
         error: error.response?.data?.message || 'Failed to fetch customers'
+      });
+    }
+  },
+
+  fetchWalletHistory: async (customerId) => {
+    set({ loading: true, error: null });
+    try {
+      const res = await axiosInstance.get(`/customer/${customerId}/wallet-history`);
+      console.log(`Wallet history for customer ${customerId}:`, res.data);
+
+      const history = res.data?.data || [];
+
+      set(state => ({
+        walletHistory: {
+          ...state.walletHistory,
+          [customerId]: history
+        },
+        loading: false
+      }));
+    } catch (error) {
+      console.error('Failed to fetch wallet history:', error);
+      set({
+        loading: false,
+        error: error.response?.data?.message || 'Failed to fetch wallet history'
       });
     }
   },
@@ -183,10 +208,11 @@ const useCustomerStore = create((set, get) => ({
     }
   },
 
-  getCustomerById: (id) => {
-    const { customers } = get();
-    return customers.find(customer => customer.customerId === id);
-  },
+getCustomerById: (customerId) => {
+  const { customers } = get();
+  return customers.find((c) => c.customerId === customerId);
+},
+
 
   checkWalletBalance: (customerId, requiredAmount) => {
     const customer = get().getCustomerById(customerId);
@@ -197,4 +223,6 @@ const useCustomerStore = create((set, get) => ({
   clearError: () => set({ error: null }),
 }));
 
+// ✅ Export both the store and the live state getter
+export const getCustomerStoreState = useCustomerStore.getState;
 export default useCustomerStore;
